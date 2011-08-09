@@ -10,6 +10,7 @@ use Authen::Passphrase;
 use Data::Dumper;
 use Module::Runtime qw(use_module);
 
+
 our $VERSION = '0.0.1';
 
 
@@ -18,7 +19,7 @@ register password => \&password;
 
 
 sub password {
-    # Default settings, so it works out of the box
+    # Default settings, so it works out of the box should contain all possible settings
     my $defaults = {
         scheme => 'BlowfishCrypt',
         BlowfishCrypt => {
@@ -27,7 +28,7 @@ sub password {
         },
         SaltedDigest => {
             algorithm   => 'SHA-1',
-            salt_random => 1,
+#            salt_random => 1,
         },
     };
 
@@ -49,13 +50,55 @@ sub password {
 sub is_valid {
     my ($self, $plaintext, $hash, $options) = @_;
 
+    # We are forcing the check to be a specific scheme, so manually hash the plaintext
+    if ($options) {
+        my $config = $self->_get_config($options);
+        my $encoding = $config->{settings}->{encoding} || 'hash_hex';
+        delete $config->{settings}->{encoding};
+
+        my $passphrase = use_module("Authen::Passphrase::$config->{scheme}")->new(
+             %{$config->{settings}}, (passphrase => $plaintext)
+        );
+        
+        if ($hash eq $passphrase->$encoding()) {
+            return 1;
+        }
+
+        return undef;
+    }
+
     # TODO: Force checks using options
     # Create a crypt string and use the recognizer below.
-
     if (my $recogniser = _get_recogniser($hash)) {
         return $recogniser->match($plaintext);
     }
+    
+    return undef;
 }
+
+
+sub extract_salt {
+    my ($self, $hash) = @_;
+    $self->_extract_item('salt', $hash);
+}
+
+sub extract_hash {
+    my ($self, $hash) = @_;
+    $self->_extract_item('hash', $hash);
+}
+
+sub extract_algorithm {
+    my ($self, $hash) = @_;
+    $self->_extract_item('algorithm', $hash);
+}
+
+sub extract_cost {
+    my ($self, $hash) = @_;
+    $self->_extract_item('cost', $hash);
+}
+
+
+
 
 
 sub generate_hash {
@@ -67,14 +110,19 @@ sub generate_hash {
          %{$config->{settings}}, (passphrase => $plaintext)
     );
 
+    Dancer::Logger::error($passphrase->hash());
+
     # TODO: If can't be stored as rfc2307 format return the hash raw
     return $passphrase->as_rfc2307();
 }
 
 
 
-
-
+sub _extract_item {
+    my ($self, $type, $hash) = @_;
+    my $recogniser = _get_recogniser($hash);
+    return $recogniser->$type() if $recogniser->can($type);
+}
 
 
 sub _get_recogniser {
@@ -91,21 +139,31 @@ sub _get_recogniser {
 }
 
 
-
 sub _get_config {
     my ($self, $args) = @_;
-
     $args = {} if !$args;
 
     my $scheme = $args->{scheme} || $self->{settings}->{scheme};
     delete $args->{scheme} if $args->{scheme};
-    
+
+    my $settings = {
+        %{$self->{settings}->{$scheme}},  # Default settings are...
+        %{$args},                         # Overridden by arguments.
+    };
+
+    # Unless salt is manually specified (which you shouldn't do unless you know what you're doing)
+    # We generate a random salt, the same length as the hash we are creating.
+    unless ( grep /^salt/, keys %{$settings}) {
+        if ($settings->{algorithm} eq 'SHA-1') {
+            $settings->{salt_random} = 20;
+        } else {
+            $settings->{salt_random} = 40;
+        }
+    }
+
     return {
         scheme   => $scheme,
-        settings => {
-            %{$self->{settings}->{$scheme}},  # Default settings are…
-            %{$args},                         # Overridden by arguments.
-        }
+        settings => $settings,
     };
 }
 
