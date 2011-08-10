@@ -6,13 +6,10 @@ use strict;
 
 use Dancer::Plugin;
 use Dancer::Config;
-use Authen::Passphrase;
-use Data::Dumper;
-use Module::Runtime qw(use_module);
-use MIME::Base64;
+use Module::Runtime qw/use_module/;
+use MIME::Base64 qw/encode_base64/;
 
 our $VERSION = '0.0.1';
-
 
 
 register password => \&password;
@@ -75,7 +72,7 @@ sub matches {
     my $hash;
     if (ref($options) eq 'HASH') {
         my $hash = $options->{hash} || pack("H*", $options->{hash_hex});
-        $hash = '{'.$options->{scheme}.'}'.MIME::Base64::encode_base64($hash.$options->{salt}, '');
+        $hash = '{'.$options->{scheme}.'}'.encode_base64($hash.$options->{salt}, '');
     } else {
         $hash = $options;
     }
@@ -103,7 +100,6 @@ sub _extended_rfc2307 {
 }
 
 
-
 sub _add_salt {
     my ($config) = @_;
 
@@ -126,21 +122,12 @@ sub _add_salt {
 }
 
 
-
 register_plugin;
-
 
 1;
 
 
 =cut=
-
-
-
-
-    # Scheme is rfc2307 scheme name
-    # Algorithm is the Digest method (sha-1, sha-256, etc)
-    # Package is the Authen::Pass packagename (SaltedDigest, BlowfishCrypt)
 
 
 Aim is to enable developers to stop worrying about these solved problems, and move on to the rest of their app.
@@ -155,86 +142,5 @@ It strives to be a drop in replacement for older code, so one can use this plugi
 then flick the switch to a more secure method. i.e passwords are currently stored as unsalted md5 - this module can work with that.
 New code you write from then on can store passwords as bcrypt, while still verifying against the old passwords.
 When user logs in you can upgrade the old passwords
-
-May need to store the salt / hash / scheme in seperate DB columns, so being able to get that from a hash would be useful.
-
-
-
-my $pass_object = password('plaintext');
-
-$pass_object->generate_hash(); 
-$pass_object->matches('$hash');
-
-my $hashed_pw = password('plaintext')->generate_hash();
-my %password_details = password('plaintext')->generate_hash();
-
-
-my $generated_password = password();
-my $generated_password = password->generate_randon();
-
-
-https://www.opends.org/wiki/page/TheUserPasswordAttributeSyntax
-Add support for:
-{SSHA224}, {SSHA256}, {SSHA384}, {SSHA512}
-{SHA224}, {SHA256}, {SHA384}, {SHA512}
-
-
-
-
-password('plaintext');
-password('plaintext')->matches('hash');
-
-password('plaintext')->generate_hash({});
-
-password()->generate_hash({});
-
-
-
-
-List context, returns hash.
-
-my %password_details = password('plaintext');
-
-salt => '',
-cost => '',
-hash => '',
-crypt_string => '',
-rfc_2307 => '',
-hash_base64 => '',
-
-
-scalar context, returns rfc_2307
-
-
-void context, returns object.
-
-
-
-CURRENT:
-
-password->extract_salt('$hash');
-password->extract_hash('$hash');
-password->extract_scheme('$hash');
-password->generate_hash('plaintext');
-password->generate_salt();
-password->generate_password();
-password->is_valid('plaintext', 'hashed_pass');
-
-password->generate_hash('plaintext', {
-    scheme => 'bcyrpt',
-    salt   => 'random',
-    cost   => 8,
-});
-
-password->generate_password({
-    length => 8
-});
-
-password->is_valid('plaintext', 'hashed_pass', {
-    scheme => 'bcyrpt',
-    salt   => 'random',
-    cost   => 8,
-});
-
 
 
