@@ -52,27 +52,9 @@ sub generate_hash {
     delete $config->{package};
     $config = _add_salt($config);
 
-    my $pass = use_module("Authen::Passphrase::$package")->new(
+    $self->{recogniser} = use_module("Authen::Passphrase::$package")->new(
          %{$config}, (passphrase => $self->{passphrase})
     );
-
-
-    # Algorithms that aren't in the RFC, but commonly used in LDAP userPasswords
-    if ($config->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
-        my $scheme = $config->{algorithm};
-
-
-        
-
-        $scheme =~ s/-//;
-        my $rfc = "{".($pass->{salt} eq "" ? "" : "S").$scheme."}".encode_base64($pass->{hash}.$pass->{salt}, '');
-        #die Dumper($pass);
-
-        #die Dumper($rfc);
-
-        #return 
-    }
-
 
     # Return a bunch of useful info if we want.
     # Cleaner than lots of methods.
@@ -80,8 +62,7 @@ sub generate_hash {
 
     }
 
-
-    return $pass->_extended_rfc2307();
+    return $self->_extended_rfc2307();
 }
 
 
@@ -110,14 +91,15 @@ sub matches {
 sub _extended_rfc2307 {
     my ($self) = @_;
 
-    my $scheme = $self->{algorithm};
+    my $scheme = $self->{recogniser}->{algorithm};
     $scheme =~ s/-//;
 
-    if ($self->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
-        return "{".($self->{salt} eq "" ? "" : "S").$scheme."}".encode_base64($self->{hash}.$self->{salt}, '');
+    if ($self->{recogniser}->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
+        return "{".($self->{recogniser}->{salt} eq "" ? "" : "S").$scheme."}".
+            encode_base64($self->{recogniser}->{hash}.$self->{recogniser}->{salt}, '');
     }
 
-    return $self->as_rfc2307();
+    return $self->{recogniser}->as_rfc2307();
 }
 
 

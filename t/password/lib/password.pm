@@ -32,7 +32,7 @@ get '/' => sub {
 
     die Dumper(password($password)->generate_hash({
         package    => 'SaltedDigest',
-        algorithm  => 'SHA-512',
+        algorithm  => 'SHA-1',
         salt_random => 20,
     }));
 
