@@ -9,7 +9,7 @@ use Dancer::Config;
 use Authen::Passphrase;
 use Data::Dumper;
 use Module::Runtime qw(use_module);
-
+use MIME::Base64;
 
 our $VERSION = '0.0.1';
 
@@ -19,155 +19,129 @@ register password => \&password;
 
 
 sub password {
-    # Default settings, so it works out of the box should contain all possible settings
-    my $defaults = {
-        scheme => 'BlowfishCrypt',
-        BlowfishCrypt => {
+    my $plaintext = shift;
+    my $config    = plugin_setting;
+
+   # Default settings if nothing in config.yml or we've not configured the default
+    if (!defined($config->{default}) || !defined($config->{$config->{default}})) {
+        $config->{default} = 'BlowfishCrypt';
+        $config->{BlowfishCrypt} = {
             cost        => 4,
-            salt_random => 1
-        },
-        SaltedDigest => {
-            algorithm   => 'SHA-1',
-#            salt_random => 1,
-        },
-    };
-
-    # Read the settings from config.yml - they override the defaults above.
-    my $settings = {};
-    for my $key (keys %{$defaults}) {
-        if (ref($defaults->{$key}) eq 'HASH') {   
-            %{$settings->{$key}} = (%{$defaults->{$key}}, %{plugin_setting->{$key}});
-        } else {
-            $settings->{$key} = plugin_setting->{$key} || $defaults->{$key};
-        }
+            key_nul     => 1,
+            salt_random => 128,
+        };
     }
 
-    return bless { settings => $settings }, 'Dancer::Plugin::Passphrase';
+    my $package = $config->{default};
+    $config->{$package} = _add_salt($config->{$package});
+
+    return bless {
+        package    => $package,
+        config     => $config->{$package},
+        passphrase => $plaintext,
+    }, 'Dancer::Plugin::Passphrase';
+
 }
-
-
-
-sub is_valid {
-    my ($self, $plaintext, $hash, $options) = @_;
-
-    # We are forcing the check to be a specific scheme, so manually hash the plaintext
-    if ($options) {
-        my $config = $self->_get_config($options);
-        my $encoding = $config->{settings}->{encoding} || 'hash_hex';
-        delete $config->{settings}->{encoding};
-
-        my $passphrase = use_module("Authen::Passphrase::$config->{scheme}")->new(
-             %{$config->{settings}}, (passphrase => $plaintext)
-        );
-        
-        if ($hash eq $passphrase->$encoding()) {
-            return 1;
-        }
-
-        return undef;
-    }
-
-    # TODO: Force checks using options
-    # Create a crypt string and use the recognizer below.
-    if (my $recogniser = _get_recogniser($hash)) {
-        return $recogniser->match($plaintext);
-    }
-    
-    return undef;
-}
-
-
-sub extract_salt {
-    my ($self, $hash) = @_;
-    $self->_extract_item('salt', $hash);
-}
-
-sub extract_hash {
-    my ($self, $hash) = @_;
-    $self->_extract_item('hash', $hash);
-}
-
-sub extract_algorithm {
-    my ($self, $hash) = @_;
-    $self->_extract_item('algorithm', $hash);
-}
-
-sub extract_cost {
-    my ($self, $hash) = @_;
-    $self->_extract_item('cost', $hash);
-}
-
-
-
-
 
 sub generate_hash {
-    my ($self, $plaintext, $options) = @_;
+    my ($self, $options) = @_;
 
-    my $config = $self->_get_config($options);
+    my $config  = $options || $self->{config};
+    my $package = $options->{package} || $self->{package};
 
-    my $passphrase = use_module("Authen::Passphrase::$config->{scheme}")->new(
-         %{$config->{settings}}, (passphrase => $plaintext)
+    delete $config->{package};
+    $config = _add_salt($config);
+
+    my $pass = use_module("Authen::Passphrase::$package")->new(
+         %{$config}, (passphrase => $self->{passphrase})
     );
 
-    Dancer::Logger::error($passphrase->hash());
 
-    # TODO: If can't be stored as rfc2307 format return the hash raw
-    return $passphrase->as_rfc2307();
-}
-
+    # Algorithms that aren't in the RFC, but commonly used in LDAP userPasswords
+    if ($config->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
+        my $scheme = $config->{algorithm};
 
 
-sub _extract_item {
-    my ($self, $type, $hash) = @_;
-    my $recogniser = _get_recogniser($hash);
-    return $recogniser->$type() if $recogniser->can($type);
-}
+        
 
+        $scheme =~ s/-//;
+        my $rfc = "{".($pass->{salt} eq "" ? "" : "S").$scheme."}".encode_base64($pass->{hash}.$pass->{salt}, '');
+        #die Dumper($pass);
 
-sub _get_recogniser {
-    my ($hash) = @_;
+        #die Dumper($rfc);
 
-    if ($hash =~ /^{\w+}/) {
-        return Authen::Passphrase->from_rfc2307($hash);
-    } elsif ($hash =~ /^\$\w+\$/) {
-        return Authen::Passphrase->from_crypt($hash);
+        #return 
     }
 
-    # We should have built a valid crypt string before trying the recogniser
-    die 'unrecognized storage format';
-}
 
+    # Return a bunch of useful info if we want.
+    # Cleaner than lots of methods.
+    if (wantarray) {
 
-sub _get_config {
-    my ($self, $args) = @_;
-    $args = {} if !$args;
-
-    my $scheme = $args->{scheme} || $self->{settings}->{scheme};
-    delete $args->{scheme} if $args->{scheme};
-
-    my $settings = {
-        %{$self->{settings}->{$scheme}},  # Default settings are...
-        %{$args},                         # Overridden by arguments.
-    };
-
-    # Unless salt is manually specified (which you shouldn't do unless you know what you're doing)
-    # We generate a random salt, the same length as the hash we are creating.
-    unless ( grep /^salt/, keys %{$settings}) {
-        if ($settings->{algorithm} eq 'SHA-1') {
-            $settings->{salt_random} = 20;
-        } else {
-            $settings->{salt_random} = 40;
-        }
     }
 
-    return {
-        scheme   => $scheme,
-        settings => $settings,
-    };
+
+    return $pass->_extended_rfc2307();
 }
 
 
+# Returns true if password matches, empty string if not
+sub matches {
+    my ($self, $options) = @_;
+
+    # $options should be rfc2307 string, crypt string, 
+    # or a hashref of options needed to construct an rfc2307 string.
+    my $hash;
+    if (ref($options) eq 'HASH') {
+        my $hash = $options->{hash} || pack("H*", $options->{hash_hex});
+        $hash = '{'.$options->{scheme}.'}'.MIME::Base64::encode_base64($hash.$options->{salt}, '');
+    } else {
+        $hash = $options;
+    }
+
+    # If it's a crypt string, make it an rfc 2307 crypt
+    $hash = '{CRYPT}'.$hash if ($hash !~ /^{\w+}/);
+
+    return Authen::Passphrase->from_rfc2307($hash)->match($self->{passphrase});
+}
+
+
+# unofficial extensions to the rfc that are widely supported
+sub _extended_rfc2307 {
+    my ($self) = @_;
+
+    my $scheme = $self->{algorithm};
+    $scheme =~ s/-//;
+
+    if ($self->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
+        return "{".($self->{salt} eq "" ? "" : "S").$scheme."}".encode_base64($self->{hash}.$self->{salt}, '');
+    }
+
+    return $self->as_rfc2307();
+}
+
+
+
+sub _add_salt {
+    my ($config) = @_;
+
+    my $salt_length = {
+        'SHA-512' => 64,
+        'SHA-384' => 48,
+        'SHA-256' => 32,
+        'SHA-224' => 28,
+        'SHA-1'   => 20,
+        'MD5'     => 16,
+        'MD4'     => 16,
+    };
+
+    # Get a random salt, unless one has been explicitly set
+    unless ( grep /^salt/, keys %{$config} ) {
+        $config->{salt_random} = $salt_length->{ $config->{algorithm} };
+    }
+
+    return $config;
+}
 
 
 
@@ -178,6 +152,14 @@ register_plugin;
 
 
 =cut=
+
+
+
+
+    # Scheme is rfc2307 scheme name
+    # Algorithm is the Digest method (sha-1, sha-256, etc)
+    # Package is the Authen::Pass packagename (SaltedDigest, BlowfishCrypt)
+
 
 Aim is to enable developers to stop worrying about these solved problems, and move on to the rest of their app.
 
@@ -196,6 +178,58 @@ May need to store the salt / hash / scheme in seperate DB columns, so being able
 
 
 
+my $pass_object = password('plaintext');
+
+$pass_object->generate_hash(); 
+$pass_object->matches('$hash');
+
+my $hashed_pw = password('plaintext')->generate_hash();
+my %password_details = password('plaintext')->generate_hash();
+
+
+my $generated_password = password();
+my $generated_password = password->generate_randon();
+
+
+https://www.opends.org/wiki/page/TheUserPasswordAttributeSyntax
+Add support for:
+{SSHA224}, {SSHA256}, {SSHA384}, {SSHA512}
+{SHA224}, {SHA256}, {SHA384}, {SHA512}
+
+
+
+
+password('plaintext');
+password('plaintext')->matches('hash');
+
+password('plaintext')->generate_hash({});
+
+password()->generate_hash({});
+
+
+
+
+List context, returns hash.
+
+my %password_details = password('plaintext');
+
+salt => '',
+cost => '',
+hash => '',
+crypt_string => '',
+rfc_2307 => '',
+hash_base64 => '',
+
+
+scalar context, returns rfc_2307
+
+
+void context, returns object.
+
+
+
+CURRENT:
+
 password->extract_salt('$hash');
 password->extract_hash('$hash');
 password->extract_scheme('$hash');
@@ -203,7 +237,6 @@ password->generate_hash('plaintext');
 password->generate_salt();
 password->generate_password();
 password->is_valid('plaintext', 'hashed_pass');
-
 
 password->generate_hash('plaintext', {
     scheme => 'bcyrpt',

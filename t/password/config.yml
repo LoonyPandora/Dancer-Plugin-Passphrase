@@ -28,13 +28,11 @@ engines:
 
 plugins:
     Passphrase:
-        scheme: BlowfishCrypt
-
-        BlowfishCrypt:
-            cost: 3
+        default: BlowfishCrypt
 
         SaltedDigest:
             algorithm: 'SHA-1'
+
 
     Database:
         driver:   'mysql'

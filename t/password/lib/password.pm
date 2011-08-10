@@ -1,8 +1,14 @@
 package password;
 use Dancer ':syntax';
 
+use Authen::Passphrase;
+use Authen::Passphrase::SaltedDigest;
+
+
 use Dancer::Plugin::Passphrase;
-use Dancer::Plugin::Database;
+use Dancer::Logger qw/error/;
+
+use MIME::Base64 2.21 qw(encode_base64 decode_base64);
 
 use Data::Dumper;
 
@@ -16,13 +22,30 @@ get '/' => sub {
 
     my $tests = {};
 
-    $tests->{ssha}   = generate_test('SaltedDigest');
-    $tests->{bcrypt} = generate_test('BlowfishCrypt');
 
 
-#    my $md5 = '14ddb8585ddfc6c4670b9c18aed1fe8b';
 
-#    die password->is_valid('My Passworda', $md5, { scheme => 'SaltedDigest', algorithm => 'MD5', encoding => 'hash_hex' });
+#    die Dumper(password($password)->matches({hash_hex => '14ddb8585ddfc6c4670b9c18aed1fe8b', scheme => 'MD5' }));
+
+
+ #   die Dumper(password($password)->generate_hash());
+
+    die Dumper(password($password)->generate_hash({
+        package    => 'SaltedDigest',
+        algorithm  => 'SHA-512',
+        salt_random => 20,
+    }));
+
+
+#    die Dumper(password($password)->generate_hash());
+
+
+#     die Dumper(password($password)->matches('{CRYPT}$2a$03$8M6BSqKBglqLfE6vg6IvvOyMw2fEy6dlSmcKz19Y4GKDvJO.vPWZ.'));
+
+
+
+
+
 
     $tests->{raw_md5} = {
         plaintext    => $password,
@@ -36,24 +59,6 @@ get '/' => sub {
 };
 
 
-sub generate_test {
-    my ($scheme) = @_;
-    return undef unless $scheme;
-
-    my $hash = password->generate_hash($password, { scheme => $scheme });
-
-    return {
-        plaintext       => $password,
-        hash            => $hash,
-        is_valid        => password->is_valid($password, $hash),
-        not_valid       => password->is_valid('wrongun', $hash),
-        salt            => password->extract_salt($hash),
-        algorithm       => password->extract_algorithm($hash),
-        cost            => password->extract_cost($hash),
-        extracted_hash  => password->extract_hash($hash),
-}
-
-}
 
 
 
