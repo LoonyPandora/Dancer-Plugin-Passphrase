@@ -27,11 +27,6 @@ engines:
         encoding: 'UTF-8'
 
 plugins:
-    Passphrase:
-        default: BlowfishCrypt
-
-        SaltedDigest:
-            algorithm: 'SHA-1'
 
 
     Database:

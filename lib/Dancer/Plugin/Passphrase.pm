@@ -2,19 +2,57 @@ package Dancer::Plugin::Passphrase;
 
 # ABSTRACT: Passphrases and Passwords as objects for Dancer
 
+=pod
+
+=head1 NAME
+
+Dancer::Plugin::Passphrase - Passphrases and Passwords as objects for Dancer
+
+=head1 SYNOPSIS
+
+=head1 USAGE
+
+    package MyWebService;
+    use Dancer ':syntax';
+    use Dancer::Plugin::Passphrase;
+
+    post '/' sub => {
+        my $hash = password( param('password') )->generate_hash;
+        # [...] Store $hash in DB
+    };
+
+    get '/' sub => {
+        # [...] Retrieve $stored_hash from the DB
+
+        if ( password( param('password') )->matches($stored_hash) ) {
+            # Password matches!
+        }
+    };
+
+=cut
+
 use strict;
 
-use Dancer::Plugin;
 use Dancer::Config;
-use Module::Runtime qw/use_module/;
-use MIME::Base64 qw/decode_base64 encode_base64/;
-use Data::Entropy::Algorithms qw/rand_int/;
-use Data::Dumper;
+use Dancer::Plugin;
+
+use Data::Entropy::Algorithms qw(rand_int);
+use MIME::Base64 qw(decode_base64 encode_base64);
+use Module::Runtime qw(use_module);
 
 our $VERSION = '0.0.1';
 
 register passphrase => \&passphrase;
 
+
+=head1 KEYWORDS
+
+=head2 passphrase
+
+Pass it a plaintext password, and it returns a Dancer::Plugin::Passphrase 
+object that you can generate a hash from, or match against a stored hash
+
+=cut
 
 sub passphrase {
     my ($plaintext) = @_;
@@ -41,6 +79,16 @@ sub passphrase {
 
 }
 
+=head1 METHODS
+
+=head2 passphrase->generate_hash
+
+Generates and returns an rfc2307 representation of the plaintext password
+that is suitable for storage in a database
+
+    my $hash = passphrase('my password')->generate_hash;
+
+=cut
 
 sub generate_hash {
     my ($self, $options) = @_;
@@ -64,7 +112,27 @@ sub generate_hash {
 }
 
 
-# Just a wrapper for random string that allows you to pass options
+
+=head2 passphrase->generate_random
+
+Generates and returns 16 cryptographically random
+characters from the url-safe base64 charater set
+
+    my $rand_pass = passphrase->generate_random;
+
+The passwords generated are suitable for use as
+temporary passwords or one-time authentication tokens.
+
+You can configure the length and the character set
+used by passing a hashref of options
+
+    my $rand_pass = passphrase->generate_random({
+        length  => 32,
+        charset => ['a'..'z', 'A'..'Z'],
+    });
+
+=cut
+
 sub generate_random {
     my ($self, $options) = @_;
 
@@ -76,7 +144,32 @@ sub generate_random {
 }
 
 
-# Returns true if passphrase matches, empty string if not
+
+=head2 passphrase->matches
+
+Matches a plaintext password to a stored hash.
+Returns true if the plaintext hashes to the same value as the stored hash.
+Returns false if they don't match or if there was an error creating the hash
+
+    passphrase('my password')->matches($stored_hash);
+
+The scalar passed must be a valid rfc2307 or crypt string.
+
+You can pass a hashref of options if you need to provide extra information
+about the structure of the hash.
+
+    passphrase('my password')->matches({
+        scheme      => '', # RFC 2307 scheme
+        hash        => '', # Raw hash
+        hash_hex    => '', # Hex version of the hash
+        hash_base64 => '', # Base 64 encoded hash
+        salt        => '', # Raw salt
+        salt_hex    => '', # Hex version of the salt
+        salt_base64 => '', # Base 64 encoded salt
+    });
+
+=cut
+
 sub matches {
     my ($self, $options) = @_;
 
@@ -85,7 +178,8 @@ sub matches {
     my $hash;
     if (ref($options) eq 'HASH') {
         my $raw_hash = $options->{hash} || pack("H*", $options->{hash_hex}) || decode_base64($options->{hash_base64});
-        $hash = '{'.$options->{scheme}.'}'.encode_base64($raw_hash.$options->{salt}, '');
+        my $raw_salt = $options->{salt} || pack("H*", $options->{salt_hex}) || decode_base64($options->{salt_base64});
+        $hash = '{'.$options->{scheme}.'}'.encode_base64($raw_hash.$raw_salt, '');
     } else {
         $hash = $options;
     }
@@ -100,9 +194,10 @@ sub matches {
 }
 
 
-# Checks and returns a hash of information about the just generated hash
+
+# Returns all information about a generated hash
 sub _all_information {
-    my ($self, $package) = @_;
+    my ($self) = @_;
 
     my @potential = qw(
         salt
@@ -128,6 +223,7 @@ sub _all_information {
 }
 
 
+
 # Unofficial extensions to the rfc that are widely supported
 sub _extended_rfc2307 {
     my ($self) = @_;
@@ -146,10 +242,12 @@ sub _extended_rfc2307 {
 }
 
 
+
+# Adds a random salt by default, unless you specify otherwise
 sub _add_salt {
     my ($config) = @_;
 
-    # Amount of salt in bytes. It should be as long as the final hash function.
+    # Amount of salt in bytes. It should be as long as the final hash function
     my $salt_length = {
         'SHA-512' => 64,
         'SHA-384' => 48,
@@ -160,7 +258,6 @@ sub _add_salt {
         'MD4'     => 16,
     };
 
-    # Specify salt of necessary length - unless we've manually specified it.
     unless ( grep /^salt/, keys %{$config} ) {
         $config->{salt_random} = $salt_length->{ $config->{algorithm} };
     }
@@ -169,25 +266,35 @@ sub _add_salt {
 }
 
 
+
 register_plugin;
 
 1;
 
 
-=cut=
 
+=head1 DESCRIPTION
 
-Aim is to enable developers to stop worrying about these solved problems, and move on to the rest of their app.
+L<http://codahale.com/how-to-safely-store-a-password/>
 
-Few devs are crypto experts and will either waste a lot of time figuring out how to make things secure, or will end up with a system
-that SEEMS secure to them, but in actual fact is not secure.
+=head1 CONFIGURATION
 
-This module gives secure generation and storage of passphrases. It makes it hard to generate code that is not secure.
-It provdides an easy upgrade path to other modules, and stores passphrases in as standard a format as possible.
+=head1 SEE ALSO
 
-It strives to be a drop in replacement for older code, so one can use this plugin with leagacy applications,
-then flick the switch to a more secure method. i.e passphrases are currently stored as unsalted md5 - this module can work with that.
-New code you write from then on can store passphrases as bcrypt, while still verifying against the old passphrases.
-When user logs in you can upgrade the old passphrases
+L<Dancer>, L<Authen::Passphrase>
 
+=head1 COOKBOOK
+
+=head1 AUTHOR
+
+James Aitken <jaitken@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2011 by James Aitken.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
 
