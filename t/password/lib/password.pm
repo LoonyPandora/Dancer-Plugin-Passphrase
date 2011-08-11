@@ -15,7 +15,7 @@ use Data::Dumper;
 our $VERSION = '0.1';
 
 
-my $password = 'My Password';
+my $passphrase = 'My Password';
 
 
 get '/' => sub {
@@ -25,22 +25,22 @@ get '/' => sub {
 
 
 
-#    die Dumper(password($password)->matches({hash_hex => '14ddb8585ddfc6c4670b9c18aed1fe8b', scheme => 'MD5' }));
+#    die Dumper(passphrase($passphrase)->matches({hash_hex => '14ddb8585ddfc6c4670b9c18aed1fe8b', scheme => 'MD5' }));
 
 
- #   die Dumper(password($password)->generate_hash());
+    die Dumper(passphrase->generate_random({length=>100}) );
 
-    die Dumper(password($password)->generate_hash({
+    die Dumper(passphrase($passphrase)->generate_hash({
         package    => 'SaltedDigest',
         algorithm  => 'SHA-1',
         salt_random => 20,
     }));
 
 
-#    die Dumper(password($password)->generate_hash());
+#    die Dumper(passphrase($passphrase)->generate_hash());
 
 
-#     die Dumper(password($password)->matches('{CRYPT}$2a$03$8M6BSqKBglqLfE6vg6IvvOyMw2fEy6dlSmcKz19Y4GKDvJO.vPWZ.'));
+#     die Dumper(passphrase($passphrase)->matches('{CRYPT}$2a$03$8M6BSqKBglqLfE6vg6IvvOyMw2fEy6dlSmcKz19Y4GKDvJO.vPWZ.'));
 
 
 
@@ -48,7 +48,7 @@ get '/' => sub {
 
 
     $tests->{raw_md5} = {
-        plaintext    => $password,
+        plaintext    => $passphrase,
         hash         => '14ddb8585ddfc6c4670b9c18aed1fe8b',
     };
 
