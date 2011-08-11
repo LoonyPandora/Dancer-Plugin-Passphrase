@@ -15,7 +15,7 @@ use Data::Dumper;
 our $VERSION = '0.1';
 
 
-my $passphrase = 'My Password';
+my $passphrase = 'My Passworda';
 
 
 get '/' => sub {
@@ -24,17 +24,20 @@ get '/' => sub {
 
 
 
-
-#    die Dumper(passphrase($passphrase)->matches({hash_hex => '14ddb8585ddfc6c4670b9c18aed1fe8b', scheme => 'MD5' }));
-
-
-    die Dumper(passphrase->generate_random({length=>100}) );
-
-    die Dumper(passphrase($passphrase)->generate_hash({
-        package    => 'SaltedDigest',
-        algorithm  => 'SHA-1',
-        salt_random => 20,
+    die Dumper(passphrase($passphrase)->matches({
+        #hash_hex => '14ddb8585ddfc6c4670b9c18aed1fe8b',
+        hash_base64 => 'FN24WF3fxsRnC5wYrtH+iw==',
+        scheme   => 'MD5',
     }));
+
+
+    my %pass = passphrase($passphrase)->generate_hash({
+        package     => 'SaltedDigest',
+        algorithm   => 'SHA-1',
+        salt_random => 20,
+    });
+
+    die Dumper(\%pass);
 
 
 #    die Dumper(passphrase($passphrase)->generate_hash());

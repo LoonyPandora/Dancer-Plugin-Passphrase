@@ -7,8 +7,9 @@ use strict;
 use Dancer::Plugin;
 use Dancer::Config;
 use Module::Runtime qw/use_module/;
-use MIME::Base64 qw/encode_base64/;
+use MIME::Base64 qw/decode_base64 encode_base64/;
 use Data::Entropy::Algorithms qw/rand_int/;
+use Data::Dumper;
 
 our $VERSION = '0.0.1';
 
@@ -16,7 +17,7 @@ register passphrase => \&passphrase;
 
 
 sub passphrase {
-    my $plaintext = shift;
+    my ($plaintext) = @_;
     my $config    = plugin_setting;
 
    # Default settings if nothing in config.yml
@@ -40,6 +41,7 @@ sub passphrase {
 
 }
 
+
 sub generate_hash {
     my ($self, $options) = @_;
 
@@ -53,12 +55,12 @@ sub generate_hash {
          %{$config}, (passphrase => $self->{passphrase})
     );
 
-    # Return a bunch of useful info if we want. Cleaner than lots of methods.
+    # Return a bunch of useful info if we ask for it. Cleaner than lots of methods.
     if (wantarray) {
-
+        return $self->_all_information;
     }
 
-    return $self->_extended_rfc2307();
+    return $self->_extended_rfc2307;
 }
 
 
@@ -78,15 +80,18 @@ sub generate_random {
 sub matches {
     my ($self, $options) = @_;
 
-    # $options should be rfc2307 string, a crypt string, 
-    # or a hashref of options needed to construct an rfc2307 string.
+    # $options can be scalar containing an rfc2307 string or a crypt string.
+    # If not, it should be a hashref of options so we can build an rfc2307 string
     my $hash;
     if (ref($options) eq 'HASH') {
-        my $hash = $options->{hash} || pack("H*", $options->{hash_hex});
-        $hash = '{'.$options->{scheme}.'}'.encode_base64($hash.$options->{salt}, '');
+        my $raw_hash = $options->{hash} || pack("H*", $options->{hash_hex}) || decode_base64($options->{hash_base64});
+        $hash = '{'.$options->{scheme}.'}'.encode_base64($raw_hash.$options->{salt}, '');
     } else {
         $hash = $options;
     }
+
+    # RejectAll, rather than AcceptAll by default. Better to fail secure than fail safe
+    $hash = '*' if (!$hash);
 
     # If it's a crypt string, make it rfc 2307 compliant
     $hash = '{CRYPT}'.$hash if ($hash !~ /^{\w+}/);
@@ -95,17 +100,45 @@ sub matches {
 }
 
 
+# Checks and returns a hash of information about the just generated hash
+sub _all_information {
+    my ($self, $package) = @_;
+
+    my @potential = qw(
+        salt
+        salt_hex
+        salt_base64
+        hash
+        hash_hex
+        hash_base64
+        cost
+        key_nul
+        as_crypt
+        algorithm
+    );
+
+    my %defined;
+    for my $method (@potential) {
+        if ($self->{recogniser}->can($method)) {
+            $defined{$method} = $self->{recogniser}->$method;
+        }
+    }
+
+    return %defined;
+}
+
 
 # Unofficial extensions to the rfc that are widely supported
 sub _extended_rfc2307 {
     my ($self) = @_;
 
     my $r = $self->{recogniser};
-    $r->{algorithm} =~ s/-//;
+    my $scheme = $r->{algorithm};
+    $scheme =~ s/-//;
 
-    if ($r->{algorithm} ~~ [qw(SHA224 SHA256 SHA384 SHA512)]) {
+    if ($r->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
         # Check for salt and add the S prefix if it has.
-        return "{".($r->{salt} eq "" ? "" : "S").$r->{algorithm}."}".
+        return "{".($r->{salt} eq "" ? "" : "S").$scheme."}".
             encode_base64($r->{hash}.$r->{salt}, '');
     }
 
