@@ -2,13 +2,19 @@ package Dancer::Plugin::Passphrase;
 
 # ABSTRACT: Passphrases and Passwords as objects for Dancer
 
-=pod
-
 =head1 NAME
 
 Dancer::Plugin::Passphrase - Passphrases and Passwords as objects for Dancer
 
 =head1 SYNOPSIS
+
+This plugin manages the hasing of passwords for Dancer apps, allowing 
+developers to follow best cryptography practice without having to 
+become a cryptography expert.
+
+It wraps the functionality of L<Authen::Passphrase>, adds features, 
+and provides sane defaults where appropriate.
+
 
 =head1 USAGE
 
@@ -18,6 +24,7 @@ Dancer::Plugin::Passphrase - Passphrases and Passwords as objects for Dancer
 
     post '/' sub => {
         my $hash = password( param('password') )->generate_hash;
+
         # [...] Store $hash in DB
     };
 
@@ -27,6 +34,10 @@ Dancer::Plugin::Passphrase - Passphrases and Passwords as objects for Dancer
         if ( password( param('password') )->matches($stored_hash) ) {
             # Password matches!
         }
+    };
+
+    get '/generate_password' sub => {
+        return password->generate_random;
     };
 
 =cut
@@ -83,7 +94,7 @@ sub passphrase {
 
 =head2 passphrase->generate_hash
 
-Generates and returns an rfc2307 representation of the plaintext password
+Generates and returns an RFC 2307 representation of the plaintext password
 that is suitable for storage in a database
 
     my $hash = passphrase('my password')->generate_hash;
@@ -153,7 +164,7 @@ Returns false if they don't match or if there was an error creating the hash
 
     passphrase('my password')->matches($stored_hash);
 
-The scalar passed must be a valid rfc2307 or crypt string.
+The scalar passed must be a valid RFC 2307 or crypt string.
 
 You can pass a hashref of options if you need to provide extra information
 about the structure of the hash.
@@ -173,8 +184,8 @@ about the structure of the hash.
 sub matches {
     my ($self, $options) = @_;
 
-    # $options can be scalar containing an rfc2307 string or a crypt string.
-    # If not, it should be a hashref of options so we can build an rfc2307 string
+    # $options can be scalar containing an RFC 2307 string or a crypt string.
+    # If not, it should be a hashref of options so we can build an RFC 2307 string
     my $hash;
     if (ref($options) eq 'HASH') {
         my $raw_hash = $options->{hash} || pack("H*", $options->{hash_hex}) || decode_base64($options->{hash_base64});
@@ -224,7 +235,7 @@ sub _all_information {
 
 
 
-# Unofficial extensions to the rfc that are widely supported
+# Unofficial extensions to the RFC that are widely supported
 sub _extended_rfc2307 {
     my ($self) = @_;
 
@@ -272,12 +283,128 @@ register_plugin;
 1;
 
 
-
 =head1 DESCRIPTION
 
+=head2 Purpose
+
+The aim of this module is to help you store new passwords in a secure manner, 
+whilst still being able to verify and upgrade older passwords.
+
+Cryptography is a vast and complex field. Many people try to roll their own 
+methods for securing user data, but succeed only in coming up with 
+a system that has little real security.
+
+This plugin provides a simple way of managing that complexity, allowing 
+developers to follow best crypto practice without having to become a cryptography expert.
+
+To ease the transition from a custom solution, this plugin is built
+on top of C<Authen::Passphrase>, an excellent module that provides an interface 
+to many common and uncommon hashing schemes.
+
+See the cookbook for some ideas on how to do this.
+
+=head2 Rationale
+
+The module defaults to hasing passwords using the bcrypt algorithm, returning them
+in RFC 2307 format.
+
+RFC 2307 describes an encoding system for passphrase hashes, as used in the "userPassword"
+attribute in LDAP databases. It encodes hashes as ASCII text, and supports several 
+passphrase schemes by starting the encoding with an alphanumeric scheme identifier enclosed 
+in braces.
+
+Bcrypt is an adaptive hashing algorithm that is designed to resist brute 
+force attacks by including a cost (aka work factor). This cost increases 
+the computational effort it takes to compute the hash.
+
+SHA and MD5 are designed to be fast, and modern machines compute a billion 
+hashes a second. With computers getting faster every day, simply brute forcing 
+SHA hashes is a very real problem that cannot be easily solved.
+
+Increasing the cost of generating a bcrypt hash is a trivial way to make 
+brute forcing ineffective. With a low cost setting, bcrypt is as secure 
+as a more traditional SHA+salt scheme, and just as fast.
+
+For a more details description of why bcrypt should be used, see this article: 
 L<http://codahale.com/how-to-safely-store-a-password/>
 
+=head2 Common Mistakes
+
+Common mistakes people make when rolling their own solution. If any of these 
+seem familiar, you should probably be using this module
+
+=over
+
+=item Passwords are stored as plain text for $reason
+
+There is never a valid reason to store a password as plain text.
+Passwords should be reset and not emailed to customers when they forget.
+Support representatives should be able to login as a user without 
+knowing the users password.
+
+=item No-one will ever guess our super secret algorithm!
+
+Unless you're a cryptography expert with many years spent studying 
+super-complex maths, your algorithm is almost certainly not as secure 
+as you think. Just because it's hard for you to break doesn't mean
+that it's computationally difficult to break.
+
+=item Our application-wide salt is "Sup3r_S3cret_L0ng_Word" - No-one will ever guess that.
+
+A common misunderstanding of what a salt is meant to do. The purpose of a 
+salt is to make sure the same password doesn't always generate the same hash.
+It needs to be different each time you hash a password, and isn't meant 
+to be a shared secret key.
+
+=item We generate our random salt using C<rand>.
+
+C<rand> isn't actually random, it's non-unform pseudo-random, 
+and not suitable for cryptographic applications.
+
+=item We use C<md5(pass.salt)>, and the salt is from C</dev/random>
+
+MD5 has been broken and has been for years. Commodity hardware can find a 
+hash collision in seconds. This means someone can create a string that will match 
+the MD5 hash of your users password, despite being totally different.
+
+=item We use C<sha(pass.salt)>, and the salt is from C</dev/random>
+
+SHA isn't quite as broken as MD5, but it shares the same theoretical 
+weaknesses. Even without hash collisions it is vulnerable to brute forcing.
+Modern hardware is so powerful it can try a billion hashes a second. 
+That means every 7 chracter password in the range [A-Za-z0-9] can be cracked 
+in one hour on your desktop computer.
+
+=item It doesn't matter if it can be brute forced, it's secure enough
+
+Whilst it is unlikely that your database will be hacked and your hashes 
+brute forced, this module is so easy to integrate into existing codebases, 
+generates hashes that are resistant to brute forcing, and can still check 
+against your old style algorithms - What reason do you have not to use it?
+
+=back
+
+
 =head1 CONFIGURATION
+
+In config.yml, you can set the default C<Authen::Passphrase> object 
+and the default settings that will be used if you do not specify 
+the hashing method when you generate a hash. 
+
+If you do not configure the plugin it defaults to using 
+BlowfishCrypt with a cost of 7.
+
+    plugins:
+        Passphrase:
+            default: BlowfishCrypt
+        
+            BlowfishCrypt:
+                cost: 8
+                
+            SaltedDigest:
+                algorithm: 'SHA-1'
+                salt_random: 20
+
 
 =head1 SEE ALSO
 
