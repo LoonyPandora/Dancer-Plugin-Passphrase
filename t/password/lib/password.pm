@@ -1,9 +1,6 @@
 package password;
 use Dancer ':syntax';
 
-use Authen::Passphrase;
-use Authen::Passphrase::SaltedDigest;
-
 
 use Dancer::Plugin::Passphrase;
 use Dancer::Logger qw/error/;
@@ -14,8 +11,42 @@ use Data::Dumper;
 
 our $VERSION = '0.1';
 
+my $passphrase = 'ThePassword';
+my $salt       = 'TheSalt';
 
-my $passphrase = 'My Password';
+# only need to test functionality of this module
+# Authen::Passphrase comes with a lot of tests, and covers
+# generating hashes just fine.
+
+
+
+=cut
+
+- Generate bcrypt hash from password
+- Match generated pass to original password
+    - Test that correct password works
+    - incorrect password fails
+
+- Generate SaltedHash style hash by passing custom settings
+- Match against password without specifying scheme
+    - Test that correct password works
+    - incorrect password fails
+
+- Match password against plain hash with no scheme
+    - With salt_hex
+    - salt_base64
+    - hash_hex
+    - hash_base64
+
+- Generate random password
+- Generate hash in list context, check values
+
+
+
+
+want to just pass package
+
+=cut
 
 
 get '/' => sub {
@@ -23,11 +54,16 @@ get '/' => sub {
     my $tests = {};
 
 
+
     my $pass = passphrase($passphrase)->generate_hash({
         package     => 'SaltedDigest',
-        algorithm   => 'SHA-1',
-        salt_random => 20,
+#        algorithm   => 'SHA-1',
+#        salt        => $salt,
+#        salt_before => 1,
+#        salt_join   => '',
     });
+
+
 
     die Dumper($pass);
 
@@ -43,14 +79,8 @@ get '/' => sub {
 
 #     die Dumper(passphrase($passphrase)->matches('{CRYPT}$2a$03$8M6BSqKBglqLfE6vg6IvvOyMw2fEy6dlSmcKz19Y4GKDvJO.vPWZ.'));
 
-    my $pass = passphrase->matches;
-    die Dumper($pass);
-
-
-
-
-
-
+#    my $pass = passphrase->matches;
+#    die Dumper($pass);
 
 
     $tests->{raw_md5} = {

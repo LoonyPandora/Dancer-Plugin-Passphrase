@@ -42,7 +42,6 @@ It wraps the functionality of L<Authen::Passphrase>, providing sane defaults.
 
 use strict;
 
-use Dancer::Config;
 use Dancer::Plugin;
 
 use Authen::Passphrase;
@@ -74,7 +73,6 @@ sub passphrase {
     if (!defined($config->{default}) || !defined($config->{$config->{default}})) {
         $config->{default} = 'BlowfishCrypt';
         $config->{BlowfishCrypt} = {
-            package     => 'BlowfishCrypt',
             cost        => 4,
             key_nul     => 1,
             salt_random => 128,
@@ -82,9 +80,10 @@ sub passphrase {
     }
 
     $config->{$config->{default}}->{package} = $config->{default};
+    $config->{package} = $config->{default};
 
     return bless {
-        config      => $config->{$config->{default}},
+        config      => $config,
         passphrase  => $plaintext,
     }, 'Dancer::Plugin::Passphrase';
 }
@@ -121,7 +120,15 @@ are applicable for a given scheme.
 sub generate_hash {
     my ($self, $options) = @_;
 
-    $self->{config} = $options || $self->{config};
+    # Get default settings for a packake if we've only specified the package
+    if ($options->{package}) {
+        $self->{config}->{$options->{package}} = {
+            %{$self->{config}->{$options->{package}}},
+            %{$options},
+        };
+        
+        $self->{config}->{package} = $options->{package};
+    }
 
     # Amount of salt in bytes. It should be as long as the final hash function
     my $salt_length = {
@@ -135,9 +142,10 @@ sub generate_hash {
     };
 
     # Add a random salt if we know the algorithm and we've not specified salt explicitly
-    unless ( grep /^salt/, keys %{$self->{config}} ) {
-        if ($self->{config}->{algorithm}) {
-            $self->{config}->{salt_random} = $salt_length->{ $self->{config}->{algorithm} };
+    unless ( grep /^salt/, keys %{ $self->{config}->{$self->{config}->{package}} } ) {    
+        if ($self->{config}->{$self->{config}->{package}}->{algorithm}) {
+            $self->{config}->{$self->{config}->{package}}->{salt_random} = 
+                $salt_length->{ $self->{config}->{$self->{config}->{package}}->{algorithm} };
         }
     }
 
@@ -209,7 +217,13 @@ documentation for L<Authen::Passphrase> for which options are applicable for a g
 sub matches {
     my ($self, $options) = @_;
 
-    $self->{config} = $options || $self->{config};
+    # Get default settings for a packake if we've only specified the package
+    if ($options->{package}) {
+        $self->{config}->{$options->{package}} = {
+            %{$self->{config}->{$options->{package}}},
+            %{$options},
+        };
+    }
 
     my $hash = $self->_add_recogniser->_as_extended_rfc2307;
     return Authen::Passphrase->from_rfc2307($hash)->match($self->{passphrase});
@@ -221,8 +235,8 @@ sub matches {
 sub _add_recogniser {
     my ($self) = @_;
 
-    my $config  = $self->{config};
-    my $package = $config->{package};
+    my $package = $self->{config}->{package};
+    my $config  = $self->{config}->{$package};
 
     # Decode & add the hash+salt if we want a recogniser from a stored hash.
     if ( grep /^hash/, keys %{$config} ) {
@@ -235,7 +249,7 @@ sub _add_recogniser {
     }
 
     # Cleanup options that are invalid when passed to Authen::Passphrase
-    for (qw(package hash_hex hash_base64 salt_hex salt_base64)) {
+    for (qw(default package hash_hex hash_base64 salt_hex salt_base64)) {
         delete $config->{$_};
     }
 

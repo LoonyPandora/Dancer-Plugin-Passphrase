@@ -26,12 +26,12 @@ engines:
         prepend: 'use Data::Dumper; my $token = $_[0];'
         encoding: 'UTF-8'
 
-Plugins:
+plugins:
     Passphrase:
         default: BlowfishCrypt
 
         SaltedDigest:
-            algorithm: 'SHA-1'
+            algorithm: 'SHA-256'
 
 
     Database:
