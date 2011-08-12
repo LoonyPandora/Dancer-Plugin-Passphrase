@@ -45,6 +45,7 @@ use strict;
 use Dancer::Config;
 use Dancer::Plugin;
 
+use Authen::Passphrase;
 use Data::Entropy::Algorithms qw(rand_int);
 use MIME::Base64 qw(decode_base64 encode_base64);
 use Module::Runtime qw(use_module);
@@ -66,23 +67,25 @@ object that you can generate a new hash from, or match against a stored hash.
 =cut
 
 sub passphrase {
-    my ($plaintext) = @_;
+    my $plaintext = shift;
     my $config    = plugin_setting;
 
-   # Default settings if nothing configured
+    # Default settings if nothing configured
     if (!defined($config->{default}) || !defined($config->{$config->{default}})) {
         $config->{default} = 'BlowfishCrypt';
         $config->{BlowfishCrypt} = {
+            package     => 'BlowfishCrypt',
             cost        => 4,
             key_nul     => 1,
             salt_random => 128,
         };
     }
 
+    $config->{$config->{default}}->{package} = $config->{default};
+
     return bless {
-        package    => $config->{default},
-        config     => $config->{$config->{default}},
-        passphrase => $plaintext,
+        config      => $config->{$config->{default}},
+        passphrase  => $plaintext,
     }, 'Dancer::Plugin::Passphrase';
 }
 
@@ -114,25 +117,32 @@ are applicable for a given scheme.
 
 =cut
 
+
 sub generate_hash {
     my ($self, $options) = @_;
 
-    my $config  = $options || $self->{config};
-    my $package = $options->{package} || $self->{package};
+    $self->{config} = $options || $self->{config};
 
-    delete $config->{package};
-    $config = _add_salt($config);
+    # Amount of salt in bytes. It should be as long as the final hash function
+    my $salt_length = {
+        'SHA-512' => 64,
+        'SHA-384' => 48,
+        'SHA-256' => 32,
+        'SHA-224' => 28,
+        'SHA-1'   => 20,
+        'MD5'     => 16,
+        'MD4'     => 16,
+    };
 
-    $self->{recogniser} = use_module("Authen::Passphrase::$package")->new(
-         %{$config}, (passphrase => $self->{passphrase})
-    );
-
-    # Return a bunch of useful info if we ask for it. Cleaner than lots of methods.
-    if (wantarray) {
-        return $self->_all_information;
+    # Add a random salt if we know the algorithm and we've not specified salt explicitly
+    unless ( grep /^salt/, keys %{$self->{config}} ) {
+        if ($self->{config}->{algorithm}) {
+            $self->{config}->{salt_random} = $salt_length->{ $self->{config}->{algorithm} };
+        }
     }
 
-    return $self->_extended_rfc2307;
+    return $self->_add_recogniser->_all_information if wantarray;
+    return $self->_add_recogniser->_as_extended_rfc2307;
 }
 
 
@@ -183,13 +193,15 @@ about the composition of the hash. Not all options are required, see the
 documentation for L<Authen::Passphrase> for which options are applicable for a given scheme
 
     passphrase('my password')->matches({
-        scheme      => '', # RFC 2307 scheme
-        hash        => '', # Raw hash
-        hash_hex    => '', # Hex version of the hash
-        hash_base64 => '', # Base 64 encoded hash
+        package     => '', # Module in Authen::Passphrase namespace
+        algorithm   => '', # Algorithm if using SaltedDigest package
+        cost        => '', # Cost / Work Factor if using BlowfishCrypt package
         salt        => '', # Raw salt
         salt_hex    => '', # Hex version of the salt
         salt_base64 => '', # Base 64 encoded salt
+        hash        => '', # Raw hash
+        hash_hex    => '', # Hex version of the hash
+        hash_base64 => '', # Base 64 encoded hash
     });
 
 =cut
@@ -197,13 +209,41 @@ documentation for L<Authen::Passphrase> for which options are applicable for a g
 sub matches {
     my ($self, $options) = @_;
 
-    my $hash = $self->_extended_rfc2307($options);
+    $self->{config} = $options || $self->{config};
 
-    # RejectAll by default. Better to fail secure than fail safe
-    $hash = $hash || '*';
-    $hash = '{CRYPT}'.$hash if ($hash !~ /^{\w+}/);
-
+    my $hash = $self->_add_recogniser->_as_extended_rfc2307;
     return Authen::Passphrase->from_rfc2307($hash)->match($self->{passphrase});
+}
+
+
+
+# Adds the required Authen::Passphrase recogniser object on demand.
+sub _add_recogniser {
+    my ($self) = @_;
+
+    my $config  = $self->{config};
+    my $package = $config->{package};
+
+    # Decode & add the hash+salt if we want a recogniser from a stored hash.
+    if ( grep /^hash/, keys %{$config} ) {
+        $config->{hash} = $config->{hash} || pack("H*", $config->{hash_hex}) || decode_base64($config->{hash_base64});
+        unless ($config->{salt_random}) {
+            $config->{salt} = $config->{salt} || pack("H*", $config->{salt_hex}) || decode_base64($config->{salt_base64});
+        }
+    } else {
+        $config->{passphrase} = $self->{passphrase};
+    }
+
+    # Cleanup options that are invalid when passed to Authen::Passphrase
+    for (qw(package hash_hex hash_base64 salt_hex salt_base64)) {
+        delete $config->{$_};
+    }
+
+    $self->{recogniser} = use_module("Authen::Passphrase::$package")->new(
+         %{$config}
+    );
+
+    return $self;
 }
 
 
@@ -232,64 +272,33 @@ sub _all_information {
         }
     }
 
+    $defined{'passphrase'} = $self->{passphrase};
+
     return %defined;
 }
 
 
 
 # Unofficial extensions to the RFC that are widely supported
-sub _extended_rfc2307 {
-    my ($self, $options) = @_;
+sub _as_extended_rfc2307 {
+    my ($self) = @_;
 
-    # We have a recogniser that provides the as_rfc2307 method - use it!
-    if ($self->{recogniser} && $self->{recogniser}->can('as_rfc2307')) {
-        my $r = $self->{recogniser};
-        my $scheme = $r->{algorithm};
-        $scheme =~ s/-//;
-    
-        if ($r->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
-            # Check for salt and add the S prefix if it has.
-            return "{".($r->{salt} eq "" ? "" : "S").$scheme."}".
-                encode_base64($r->{hash}.$r->{salt}, '');
-        }
-    
-        return $r->as_rfc2307();
+    my $r = $self->{recogniser};
+    my $scheme = $r->{algorithm};
+    $scheme =~ s/-//;
+
+    if ($r->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
+        # Check for salt and add the S prefix if it has.
+        return "{".($r->{salt} eq "" ? "" : "S").$scheme."}".
+            encode_base64($r->{hash}.$r->{salt}, '');
     }
 
-    # Looks like we have to manually create the RFC 2307 string.
-    if (ref($options) eq 'HASH') {
-        my $raw_hash = $options->{hash} || pack("H*", $options->{hash_hex}) || decode_base64($options->{hash_base64});
-        my $raw_salt = $options->{salt} || pack("H*", $options->{salt_hex}) || decode_base64($options->{salt_base64});
-        return '{'.$options->{scheme}.'}'.encode_base64($raw_hash.$raw_salt, '');
-    }
+    return $r->as_rfc2307() if $r->can('as_rfc2307');
+    return '{CRYPT}'.$r->as_crypt() if $r->can('as_crypt');
 
-    return $options;
+    # Default to RejectAll, better to fail secure than fail safe
+    return '{CRYPT}*';
 }
-
-
-
-# Adds a random salt by default, unless you specify otherwise
-sub _add_salt {
-    my ($config) = @_;
-
-    # Amount of salt in bytes. It should be as long as the final hash function
-    my $salt_length = {
-        'SHA-512' => 64,
-        'SHA-384' => 48,
-        'SHA-256' => 32,
-        'SHA-224' => 28,
-        'SHA-1'   => 20,
-        'MD5'     => 16,
-        'MD4'     => 16,
-    };
-
-    unless ( grep /^salt/, keys %{$config} ) {
-        $config->{salt_random} = $salt_length->{ $config->{algorithm} };
-    }
-
-    return $config;
-}
-
 
 
 register_plugin;
