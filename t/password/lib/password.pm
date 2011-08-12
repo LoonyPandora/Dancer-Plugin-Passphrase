@@ -24,11 +24,11 @@ get '/' => sub {
 
 
 
-#    die Dumper(passphrase($passphrase)->matches({
-        #hash_hex => '14ddb8585ddfc6c4670b9c18aed1fe8b',
-#        hash_base64 => 'FN24WF3fxsRnC5wYrtH+iw==',
-#        scheme   => 'MD5',
-#    }));
+    die Dumper(passphrase($passphrase)->matches({
+        hash_hex => '14ddb8585ddfc6c4670b9c18aed1fe8b',
+        #hash_base64 => 'FN24WF3fxsRnC5wYrtH+iw==',
+        scheme   => 'MD5',
+    }));
 
 
 #    my %pass = passphrase($passphrase)->generate_hash({
@@ -39,11 +39,12 @@ get '/' => sub {
 
 #    die Dumper(\%pass);
 
+     die Dumper(passphrase($passphrase)->matches('{CRYPT}$2a$03$8M6BSqKBglqLfE6vg6IvvOyMw2fEy6dlSmcKz19Y4GKDvJO.vPWZ.'));
+
     my $pass = passphrase->matches;
     die Dumper($pass);
 
 
-#     die Dumper(passphrase($passphrase)->matches('{CRYPT}$2a$03$8M6BSqKBglqLfE6vg6IvvOyMw2fEy6dlSmcKz19Y4GKDvJO.vPWZ.'));
 
 
 

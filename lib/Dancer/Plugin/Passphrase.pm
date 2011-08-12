@@ -49,6 +49,8 @@ use Data::Entropy::Algorithms qw(rand_int);
 use MIME::Base64 qw(decode_base64 encode_base64);
 use Module::Runtime qw(use_module);
 
+use Data::Dumper;
+
 our $VERSION = '0.0.1';
 
 register passphrase => \&passphrase;
@@ -77,12 +79,9 @@ sub passphrase {
         };
     }
 
-    my $package = $config->{default};
-    $config->{$package} = _add_salt($config->{$package});
-
     return bless {
-        package    => $package,
-        config     => $config->{$package},
+        package    => $config->{default},
+        config     => $config->{$config->{default}},
         passphrase => $plaintext,
     }, 'Dancer::Plugin::Passphrase';
 }
@@ -96,6 +95,22 @@ Generates and returns an RFC 2307 representation of the plaintext password
 that is suitable for storage in a database.
 
     my $hash = passphrase('my password')->generate_hash;
+
+You can pass a hashref of options to specify what kind of hash should be 
+generated. You can specify any options that you can set in the config file.
+
+Refer to the documentation for L<Authen::Passphrase> for which options 
+are applicable for a given scheme.
+
+    my $hash = passphrase('my password')->generate_hash({
+        package     => '', # Module in Authen::Passphrase namespace
+        algorithm   => '', # Algorithm if using SaltedDigest package
+        cost        => '', # Cost / Work Factor if using BlowfishCrypt package
+        salt        => '', # Raw salt
+        salt_hex    => '', # Hex version of the salt
+        salt_base64 => '', # Base 64 encoded salt
+        salt_random => '', # Length of randomly generated salt 
+    });
 
 =cut
 
@@ -161,10 +176,11 @@ Returns false if they don't match or if there was an error creating the hash.
 
     passphrase('my password')->matches($stored_hash);
 
-The scalar passed must be a valid RFC 2307 or crypt string.
+If you pass a scalar, it must be a valid RFC 2307 or crypt string.
 
 You can pass a hashref of options if you need to provide extra information
-about the structure of the hash.
+about the composition of the hash. Not all options are required, see the 
+documentation for L<Authen::Passphrase> for which options are applicable for a given scheme
 
     passphrase('my password')->matches({
         scheme      => '', # RFC 2307 scheme
@@ -181,21 +197,10 @@ about the structure of the hash.
 sub matches {
     my ($self, $options) = @_;
 
-    # $options can be scalar containing an RFC 2307 string or a crypt string.
-    # If not, it should be a hashref of options so we can build an RFC 2307 string
-    my $hash;
-    if (ref($options) eq 'HASH') {
-        my $raw_hash = $options->{hash} || pack("H*", $options->{hash_hex}) || decode_base64($options->{hash_base64});
-        my $raw_salt = $options->{salt} || pack("H*", $options->{salt_hex}) || decode_base64($options->{salt_base64});
-        $hash = '{'.$options->{scheme}.'}'.encode_base64($raw_hash.$raw_salt, '');
-    } else {
-        $hash = $options;
-    }
+    my $hash = $self->_extended_rfc2307($options);
 
-    # RejectAll, rather than AcceptAll by default. Better to fail secure than fail safe
-    $hash = '*' if (!$hash);
-
-    # If it's a crypt string, make it rfc 2307 compliant
+    # RejectAll by default. Better to fail secure than fail safe
+    $hash = $hash || '*';
     $hash = '{CRYPT}'.$hash if ($hash !~ /^{\w+}/);
 
     return Authen::Passphrase->from_rfc2307($hash)->match($self->{passphrase});
@@ -234,19 +239,31 @@ sub _all_information {
 
 # Unofficial extensions to the RFC that are widely supported
 sub _extended_rfc2307 {
-    my ($self) = @_;
+    my ($self, $options) = @_;
 
-    my $r = $self->{recogniser};
-    my $scheme = $r->{algorithm};
-    $scheme =~ s/-//;
-
-    if ($r->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
-        # Check for salt and add the S prefix if it has.
-        return "{".($r->{salt} eq "" ? "" : "S").$scheme."}".
-            encode_base64($r->{hash}.$r->{salt}, '');
+    # We have a recogniser that provides the as_rfc2307 method - use it!
+    if ($self->{recogniser} && $self->{recogniser}->can('as_rfc2307')) {
+        my $r = $self->{recogniser};
+        my $scheme = $r->{algorithm};
+        $scheme =~ s/-//;
+    
+        if ($r->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
+            # Check for salt and add the S prefix if it has.
+            return "{".($r->{salt} eq "" ? "" : "S").$scheme."}".
+                encode_base64($r->{hash}.$r->{salt}, '');
+        }
+    
+        return $r->as_rfc2307();
     }
 
-    return $r->as_rfc2307();
+    # Looks like we have to manually create the RFC 2307 string.
+    if (ref($options) eq 'HASH') {
+        my $raw_hash = $options->{hash} || pack("H*", $options->{hash_hex}) || decode_base64($options->{hash_base64});
+        my $raw_salt = $options->{salt} || pack("H*", $options->{salt_hex}) || decode_base64($options->{salt_base64});
+        return '{'.$options->{scheme}.'}'.encode_base64($raw_hash.$raw_salt, '');
+    }
+
+    return $options;
 }
 
 
