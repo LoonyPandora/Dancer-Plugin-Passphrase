@@ -79,7 +79,6 @@ sub passphrase {
         };
     }
 
-    $config->{$config->{default}}->{package} = $config->{default};
     $config->{package} = $config->{default};
 
     return bless {
@@ -116,72 +115,14 @@ are applicable for a given scheme.
 
 =cut
 
-
 sub generate_hash {
     my ($self, $options) = @_;
 
-    # Get default settings for a packake if we've only specified the package
-    if ($options->{package}) {
-        $self->{config}->{$options->{package}} = {
-            %{$self->{config}->{$options->{package}}},
-            %{$options},
-        };
-        
-        $self->{config}->{package} = $options->{package};
-    }
-
-    # Amount of salt in bytes. It should be as long as the final hash function
-    my $salt_length = {
-        'SHA-512' => 64,
-        'SHA-384' => 48,
-        'SHA-256' => 32,
-        'SHA-224' => 28,
-        'SHA-1'   => 20,
-        'MD5'     => 16,
-        'MD4'     => 16,
-    };
-
-    # Add a random salt if we know the algorithm and we've not specified salt explicitly
-    unless ( grep /^salt/, keys %{ $self->{config}->{$self->{config}->{package}} } ) {    
-        if ($self->{config}->{$self->{config}->{package}}->{algorithm}) {
-            $self->{config}->{$self->{config}->{package}}->{salt_random} = 
-                $salt_length->{ $self->{config}->{$self->{config}->{package}}->{algorithm} };
-        }
-    }
+    $self->_get_settings($options);
+    $self->_add_random_salt;
 
     return $self->_add_recogniser->_all_information if wantarray;
     return $self->_add_recogniser->_as_extended_rfc2307;
-}
-
-
-=head2 passphrase->generate_random
-
-Generates and returns 16 cryptographically random
-characters from the url-safe base64 charater set.
-
-    my $rand_pass = passphrase->generate_random;
-
-The passwords generated are suitable for use as
-temporary passwords or one-time authentication tokens.
-
-You can configure the length and the character set
-used by passing a hashref of options.
-
-    my $rand_pass = passphrase->generate_random({
-        length  => 32,
-        charset => ['a'..'z', 'A'..'Z'],
-    });
-
-=cut
-
-sub generate_random {
-    my ($self, $options) = @_;
-
-    # Default is 16 URL-safe base64 chars. Supported everywhere and a reasonable length
-    my $length  = $options->{length}  || 16;
-    my $charset = $options->{charset} || ['a'..'z', 'A'..'Z', '0'..'9', '-', '_'];
-
-    return join '', map { @$charset[rand_int scalar @$charset] } 1..$length;
 }
 
 
@@ -217,33 +158,94 @@ documentation for L<Authen::Passphrase> for which options are applicable for a g
 sub matches {
     my ($self, $options) = @_;
 
-    # Get default settings for a packake if we've only specified the package
-    if ($options->{package}) {
-        $self->{config}->{$options->{package}} = {
-            %{$self->{config}->{$options->{package}}},
-            %{$options},
-        };
-    }
+    $self->_get_settings($options);
 
     my $hash = $self->_add_recogniser->_as_extended_rfc2307;
     return Authen::Passphrase->from_rfc2307($hash)->match($self->{passphrase});
 }
 
 
+=head2 passphrase->generate_random
+
+Generates and returns 16 cryptographically random
+characters from the url-safe base64 charater set.
+
+    my $rand_pass = passphrase->generate_random;
+
+The passwords generated are suitable for use as
+temporary passwords or one-time authentication tokens.
+
+You can configure the length and the character set
+used by passing a hashref of options.
+
+    my $rand_pass = passphrase->generate_random({
+        length  => 32,
+        charset => ['a'..'z', 'A'..'Z'],
+    });
+
+=cut
+
+sub generate_random {
+    my ($self, $options) = @_;
+
+    # Default is 16 URL-safe base64 chars. Supported everywhere and a reasonable length
+    my $length  = $options->{length}  || 16;
+    my $charset = $options->{charset} || ['a'..'z', 'A'..'Z', '0'..'9', '-', '_'];
+
+    return join '', map { @$charset[rand_int scalar @$charset] } 1..$length;
+}
+
+
+# Gets default settings for a package from config.yml
+sub _get_settings {
+    my ($self, $options) = @_;
+
+    if ($options->{package}) {
+        $self->{config}->{$options->{package}} = {
+            %{$self->{config}->{$options->{package}}},
+            %{$options},
+        };
+
+        $self->{config}->{package} = $options->{package};
+    }    
+}
+
+
+# Adds a random salt if we know the algorithm and we've not specified salt explicitly
+sub _add_random_salt {
+    my ($self) = @_;
+
+    # Amount of salt in bytes. It should be as long as the final hash function
+    my $salt_length = {
+        'SHA-512' => 64, 'SHA-384' => 48,
+        'SHA-256' => 32, 'SHA-224' => 28,
+        'SHA-1'   => 20, 'MD5'     => 16,
+        'MD4'     => 16,
+    };
+
+    my $current_package   = $self->{config}->{package};
+    my $current_algorithm = $self->{config}->{$current_package}->{algorithm};
+
+    unless ( grep /^salt/, keys %{ $self->{config}->{$current_package} } ) {    
+        if ($current_algorithm) {
+            $self->{config}->{$current_package}->{salt_random} = $salt_length->{ $current_algorithm };
+        }
+    }
+}
+
 
 # Adds the required Authen::Passphrase recogniser object on demand.
 sub _add_recogniser {
     my ($self) = @_;
 
-    my $package = $self->{config}->{package};
-    my $config  = $self->{config}->{$package};
+    my $config  = $self->{config}->{ $self->{config}->{package} };
 
-    # Decode & add the hash+salt if we want a recogniser from a stored hash.
+    # Decode & add both the hash and salt if we want a recogniser from a stored hash.
+    # Specifying a random salt is silly if we want to verify an existing hash, so delete it even if specified.
     if ( grep /^hash/, keys %{$config} ) {
         $config->{hash} = $config->{hash} || pack("H*", $config->{hash_hex}) || decode_base64($config->{hash_base64});
-        unless ($config->{salt_random}) {
-            $config->{salt} = $config->{salt} || pack("H*", $config->{salt_hex}) || decode_base64($config->{salt_base64});
-        }
+        $config->{salt} = $config->{salt} || pack("H*", $config->{salt_hex}) || decode_base64($config->{salt_base64});
+        delete $config->{salt_random};
     } else {
         $config->{passphrase} = $self->{passphrase};
     }
@@ -253,7 +255,7 @@ sub _add_recogniser {
         delete $config->{$_};
     }
 
-    $self->{recogniser} = use_module("Authen::Passphrase::$package")->new(
+    $self->{recogniser} = use_module("Authen::Passphrase::$self->{config}->{package}")->new(
          %{$config}
     );
 
@@ -261,23 +263,11 @@ sub _add_recogniser {
 }
 
 
-
 # Returns all information about a generated hash
 sub _all_information {
     my ($self) = @_;
 
-    my @potential = qw(
-        salt
-        salt_hex
-        salt_base64
-        hash
-        hash_hex
-        hash_base64
-        cost
-        key_nul
-        as_crypt
-        algorithm
-    );
+    my @potential = qw(salt hash cost key_nul as_crypt algorithm);
 
     my %defined;
     for my $method (@potential) {
@@ -286,11 +276,17 @@ sub _all_information {
         }
     }
 
-    $defined{'passphrase'} = $self->{passphrase};
+    # Some Authen::Passphrase modules provide these functions - but not all
+    for (qw(salt hash)) {
+        $defined{$_.'_hex'}     = unpack("H*", $defined{$_})      if $defined{$_};
+        $defined{$_.'_base64'}  = encode_base64($defined{$_}, '') if $defined{$_};
+    }
+
+    $defined{'passphrase'}   = $self->{passphrase};
+    $defined{'rfc_2307'}     = $self->_as_extended_rfc2307;
 
     return %defined;
 }
-
 
 
 # Unofficial extensions to the RFC that are widely supported
@@ -298,13 +294,13 @@ sub _as_extended_rfc2307 {
     my ($self) = @_;
 
     my $r = $self->{recogniser};
-    my $scheme = $r->{algorithm};
-    $scheme =~ s/-//;
 
     if ($r->{algorithm} ~~ [qw(SHA-224 SHA-256 SHA-384 SHA-512)]) {
+        my $scheme = $r->{algorithm};
+        $scheme =~ s/-//;
+
         # Check for salt and add the S prefix if it has.
-        return "{".($r->{salt} eq "" ? "" : "S").$scheme."}".
-            encode_base64($r->{hash}.$r->{salt}, '');
+        return "{".($r->{salt} eq "" ? "" : "S").$scheme."}".encode_base64($r->{hash}.$r->{salt}, '');
     }
 
     return $r->as_rfc2307() if $r->can('as_rfc2307');
