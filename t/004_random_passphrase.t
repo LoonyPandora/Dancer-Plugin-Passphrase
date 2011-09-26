@@ -1,18 +1,15 @@
-use Test::More import => ['!pass'],  tests => 2;
+use Test::More import => ['!pass'],  tests => 3;
 
 use strict;
 use warnings;
 
-use Dancer::Plugin::Bcrypt;
+use Dancer::Plugin::Passphrase;
 
-ok(
-    bcrypt('What a secure passphrase this is...')
-);
+my $with_defaults   = passphrase->generate_random;
+my $extra_length    = passphrase->generate_random({ length => 32 });
+my $scouse_password = passphrase->generate_random({ charset => ['a'], length => 3 });
 
-ok(
-    bcrypt_validate_password(
-        'What a secure passphrase this is...',
-        '$2a$04$KcIfei749yS4dGakQByOM.mKK6CpktFwoBiijHuyMyN.SMzT4sKNK'
-    )
-);
 
+ok($with_defaults,             "Basic password generation");
+ok(length $extra_length eq 32, "Custom password length");
+ok($scouse_password eq 'aaa',  "Custom chracter set");
