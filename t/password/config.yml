@@ -28,11 +28,7 @@ engines:
 
 plugins:
     Passphrase:
-        default: BlowfishCrypt
-
-        SaltedDigest:
-            algorithm: 'SHA-256'
-
+        scheme: 'bcrypt'
 
     Database:
         driver:   'mysql'
