@@ -14,8 +14,6 @@ our $VERSION = '0.1';
 my $secret = "hello";
 
 
-
-
 get '/' => sub {
 
     my $output;
