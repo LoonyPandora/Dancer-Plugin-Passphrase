@@ -53,6 +53,7 @@ use Data::Entropy::Source;
 use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
 
+
 our $VERSION = '0.1.0';
 
 register passphrase => \&passphrase;
@@ -138,9 +139,12 @@ the password hash and the salt concatenated together in that order.
     '{'.$scheme.'}'.encode_base64($hash . $salt, '');
 
 Where C<$scheme> can be any of the following and their salted variants,
-which are prefixed with an S
+which are prefixed with an S.
 
-    MD2 MD4 MD5 SHA SHA224 SHA256 SHA384 SHA512 CRYPT WHIRLPOO
+    MD5 SHA SHA224 SHA256 SHA384 SHA512 CRYPT
+
+Any algorithm that can be produced by a module conforming to the
+L<Digest> spec will have it's own scheme, these are just the default ones
 
 A complete RFC2307 string looks like this:
 
@@ -347,10 +351,22 @@ sub hash_base64 {
     return encode_base64(shift->{hash}, '');
 }
 
+=head2 passphrase->generate_hash->plaintext
+
+Returns the plaintext password as originally supplied to the L<passphrase> keyword.
+Only works on an object as returned by C<generate_hash> when C<return_object> is true
+
+    passphrase('password')->generate_hash({return_object=>1})->plaintext;
+
+=cut
+
+sub plaintext {
+    return shift->{plaintext};
+}
 
 
 
-# Actual hash generation
+# Actual generation of the hash, using the provided settings
 sub _calculate_hash {
     my $self = shift;
 
@@ -370,7 +386,7 @@ sub _calculate_hash {
 
         my $hash = Digest->new( $self->{scheme} );
 
-        $hash->add($self->{prefix_salt});
+        # $hash->add($self->{prefix_salt}); # Not implimented yet
         $hash->add($self->{plaintext});
         $hash->add($self->{salt});
 
@@ -444,7 +460,6 @@ sub _random_salt {
 # Length of a hash in octets. Used to separate salt from a hash
 sub _salt_offset {
     return {
-        'SMD2'       => 128 / 8,
         'SMD4'       => 128 / 8,
         'SMD5'       => 128 / 8,
         'SSHA'       => 160 / 8,
@@ -586,12 +601,12 @@ a strong psuedo-random salt.
                 cost: 8
 
             MD5:
-                salt: 'old and insecure salt'
+                salt: 'application-wide salt'
 
 
 =head1 SEE ALSO
 
-L<Dancer>, L<Digest>, L<Crypt::Eksblowfish::Bcrypt>
+L<Dancer>, L<Digest>, L<Crypt::Eksblowfish::Bcrypt>, L<Dancer::Plugin::Bcrypt>
 
 =head1 KNOWN ISSUES
 
@@ -616,8 +631,12 @@ to encode your text as UTF-8 before giving it to C<passphrase>.
 
 Text encoding is a bag of hurt, and if you are seeing errors like this,
 it is probably indicitive of deeper problems within your app's code.
-You will probably save yourself a lot of hassle if you read up on the L<Encode>
-module
+You will probably save yourself a lot of hassle down the line if you read
+up on the L<Encode> module sooner rather than later.
+
+For further reading on UTF-8, unicode, and text encoding in perl,
+see L<http://training.perl.com/OSCON2011/index.html>
+
 
 =head1 AUTHOR
 
