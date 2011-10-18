@@ -22,6 +22,7 @@ Icon?
 # From https://github.com/github/gitignore/blob/master/Perl.gitignore
 blib/
 _build/
+.build
 cover_db/
 inc/
 Build
