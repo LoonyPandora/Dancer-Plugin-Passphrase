@@ -54,7 +54,7 @@ use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
 
 
-our $VERSION = '0.1.0';
+our $VERSION = '0.1.1';
 
 register passphrase => \&passphrase;
 

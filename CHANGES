@@ -1,3 +1,8 @@
+0.1.1   2011-10-18
+
+    [ BUGFIX ]
+    * Made compatible with perl < 5.14
+
 0.1.0   2011-09-26
 
     ** First Public Release **
