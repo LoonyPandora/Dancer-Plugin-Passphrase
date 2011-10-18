@@ -169,7 +169,8 @@ sub matches {
         if (_salt_offset()->{$rfc2307_scheme}) {
             $salt      = substr(decode_base64($salt_and_digest),    _salt_offset()->{$rfc2307_scheme});
             $digest    = substr(decode_base64($salt_and_digest), 0, _salt_offset()->{$rfc2307_scheme});
-            $algorithm = $rfc2307_scheme =~ s/^S//r; # / syntax highlighting bug
+            $algorithm = $rfc2307_scheme;
+            $algorithm =~ s/^S//;
         } else {
             $salt      = '';
             $digest    = decode_base64($salt_and_digest);
@@ -375,7 +376,8 @@ sub _calculate_hash {
         $self->{hash}    = bcrypt($self->{plaintext}, $template);
         $self->{rfc2307} = '{CRYPT}'.$self->{hash};
     } else {
-        my $rfc2307_scheme = uc $self->{scheme} =~ s/\W+//r; # / syntax highlighting bug
+        my $rfc2307_scheme = uc $self->{scheme};
+        $rfc2307_scheme =~ s/\W+//;
 
         $rfc2307_scheme = 'SHA'   if $rfc2307_scheme eq 'SHA1';
         $rfc2307_scheme = 'CRYPT' if $rfc2307_scheme eq 'BCRYPT';
