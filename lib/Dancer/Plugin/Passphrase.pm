@@ -620,10 +620,7 @@ or
 
     Input must contain only octets
 
-This means you will will probably have to use the L<Encode> module to
-encode the string in UTF-8 before passing it to the C<passphrase> keyword.
-
-Both the MD5 and bcrypt algorithms can't handle chracters with an ordinal
+The MD5 and bcrypt algorithms can't handle chracters with an ordinal
 value above 255, and produce errors like this if they encounter them.
 It is not possible for this plugin to automagically work out the correct
 encoding for a given string.
@@ -631,8 +628,9 @@ encoding for a given string.
 If you see errors like this, then you probably need to use the L<Encode> module
 to encode your text as UTF-8 before giving it to C<passphrase>.
 
-Text encoding is a bag of hurt, and if you are seeing errors like this,
-it is probably indicitive of deeper problems within your app's code.
+Text encoding is a bag of hurt, and errors like this are probably indicitive
+of deeper problems within your app's code.
+
 You will probably save yourself a lot of hassle down the line if you read
 up on the L<Encode> module sooner rather than later.
 
