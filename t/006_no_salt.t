@@ -5,7 +5,7 @@ use warnings;
 
 use Dancer::Plugin::Passphrase;
 
-my $secret     = "Super Secret Squirrel";
+my $secret      = "Super Secret Squirrel";
 my $known_value = '{SHA}lmrkJArUS4AvuHtllhJG2hOBlcE=';
 
 # Bcrypt has to have a salt, so we pick a different algorithm

@@ -7,13 +7,12 @@ use Dancer::Plugin::Passphrase;
 
 my $secret = "Super Secret Squirrel";
 
-my $object = passphrase($secret)->generate_hash({return_object => 1});
-
+my $object = passphrase($secret)->generate_hash;
 
 ok(ref($object) eq 'Dancer::Plugin::Passphrase',  'Creates correct object');
 ok($object->rfc2307,                              'Contains RFC 2307 representation');
 ok($object->scheme eq 'BCRYPT',                   'Contains correct scheme');
-ok($object->cost eq '04',                         'Contains correct cost');
+ok($object->cost   eq '04',                       'Contains correct cost');
 ok($object->raw_hash,                             'Contains raw salt');
 ok($object->hash_hex,                             'Contains hex hash');
 ok($object->hash_base64,                          'Contains base64 hash');
