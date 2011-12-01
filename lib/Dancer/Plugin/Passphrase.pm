@@ -53,8 +53,13 @@ use Data::Entropy::Source;
 use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
 
+our $VERSION = '1.0.0';
 
-our $VERSION = '0.1.1';
+# Auto stringifies and returns the RFC 2307 representation
+# of the object unless we are calling a method on it
+use overload (
+    '""' => 'rfc2307'
+);
 
 register passphrase => \&passphrase;
 
@@ -97,15 +102,10 @@ A cryptographically random salt is used if salt is not defined.
 Only if you specify the empty string will an empty salt be used
 This is not recommended, and should only be used to upgrade old insecure hashes
 
-If C<return_object> is true, then an object is returned allowing you
-to access the components of the RFC 2307 hash individually. This is useful
-if you wish to store the salt and hash in different database columns.
-
     my $hash = passphrase('my password')->generate_hash({
-        scheme        => '', # What method we'll use to hash
-        cost          => '', # Cost / Work Factor if using bcrypt 
-        salt          => '', # Manually specify salt if using a salted digest
-        return_object => '', # Returns an object, rather than the rfc2307 string
+        scheme => '', # What method we'll use to hash
+        cost   => '', # Cost / Work Factor if using bcrypt 
+        salt   => '', # Manually specify salt if using a salted digest
     });
 
 =cut
@@ -116,9 +116,7 @@ sub generate_hash {
     $self->_get_settings($options);
     $self->_calculate_hash;
 
-    return $self if $self->{return_object};
-
-    return $self->rfc2307;
+    return $self;
 }
 
 
@@ -231,138 +229,160 @@ sub generate_random {
 =head2 passphrase->generate_hash->rfc2307
 
 Returns the rfc2307 representation from a C<Dancer::Plugin::Passphrase> object.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true
-
-    passphrase('password')->generate_hash({return_object=>1})->rfc2307;
+Retu
+    passphrase('password')->generate_hash->rfc2307;
 
 =cut
 
 sub rfc2307 {
-    return shift->{rfc2307};
+    my $self = shift;
+
+    return undef unless $self->{rfc2307};
+    return $self->{rfc2307};
 }
 
 
 =head2 passphrase->generate_hash->scheme
 
 Returns the scheme from a C<Dancer::Plugin::Passphrase> object.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true
 
-    passphrase('password')->generate_hash({return_object=>1})->scheme;
+    passphrase('password')->generate_hash->scheme;
 
 =cut
 
 sub scheme {
-    return shift->{scheme};
+    my $self = shift;
+
+    return undef unless $self->{scheme};
+    return $self->{scheme};
 }
 
 
 =head2 passphrase->generate_hash->cost
 
 Returns the bcrypt cost from a C<Dancer::Plugin::Passphrase> object.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true.
 Only works when using the bcrypt algorithm, returns undef for other algorithms
 
-    passphrase('password')->generate_hash({return_object=>1})->cost;
+    passphrase('password')->generate_hash->cost;
 
 =cut
 
 sub cost {
-    return shift->{cost};
+    my $self = shift;
+
+    return undef unless $self->{cost};
+    return $self->{cost};
 }
 
 
 =head2 passphrase->generate_hash->raw_salt
 
 Returns the raw salt from a C<Dancer::Plugin::Passphrase> object.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true
 
-    passphrase('password')->generate_hash({return_object=>1})->raw_salt;
+    passphrase('password')->generate_hash->raw_salt;
 
 =cut
 
-sub raw_salt    { return shift->{salt};    }
+sub raw_salt {
+    my $self = shift;
+
+    return undef unless $self->{salt};
+    return $self->{salt};
+}
 
 
 =head2 passphrase->generate_hash->raw_hash
 
 Returns the raw hash from a C<Dancer::Plugin::Passphrase> object.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true
 
-    passphrase('password')->generate_hash({return_object=>1})->raw_hash;
+    passphrase('password')->generate_hash->raw_hash;
 
 =cut
 
 sub raw_hash {
-    return shift->{hash};
+    my $self = shift;
+
+    return undef unless $self->{hash};
+    return $self->{hash};
 }
 
 
 =head2 passphrase->generate_hash->salt_hex
 
 Returns the hex-encoded salt from a C<Dancer::Plugin::Passphrase> object.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true
 
-    passphrase('password')->generate_hash({return_object=>1})->salt_hex;
+    passphrase('password')->generate_hash->salt_hex;
 
 =cut
 
 sub salt_hex {
-    return unpack("H*", shift->{salt});
+    my $self = shift;
+
+    return undef unless $self->{salt};
+    return unpack("H*", $self->{salt});
 }
 
 
 =head2 passphrase->generate_hash->hash_hex
 
 Returns the hex-encoded hash from a C<Dancer::Plugin::Passphrase> object.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true
 
-    passphrase('password')->generate_hash({return_object=>1})->hash_hex;
+    passphrase('password')->generate_hash->hash_hex;
 
 =cut
 
 sub hash_hex {
-    return unpack("H*", shift->{hash});
+    my $self = shift;
+
+    return undef unless $self->{hash};
+    return unpack("H*", $self->{hash});
 }
 
 
 =head2 passphrase->generate_hash->salt_base64
 
 Returns the base64 encoded salt from a C<Dancer::Plugin::Passphrase> object.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true
 
-    passphrase('password')->generate_hash({return_object=>1})->salt_base64;
+    passphrase('password')->generate_hash->salt_base64;
 
 =cut
 
 sub salt_base64 {
-    return encode_base64(shift->{salt}, '');
+    my $self = shift;
+
+    return undef unless $self->{salt};
+    return encode_base64($self->{salt}, '');
 }
 
 
 =head2 passphrase->generate_hash->hash_base64
 
 Returns the base64 encoded hash from a C<Dancer::Plugin::Passphrase> object.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true
 
-    passphrase('password')->generate_hash({return_object=>1})->hash_base64;
+    passphrase('password')->generate_hash->hash_base64;
 
 =cut
 
 sub hash_base64 {
-    return encode_base64(shift->{hash}, '');
+    my $self = shift;
+
+    return undef unless $self->{hash};
+    return encode_base64($self->{hash}, '');
 }
 
 =head2 passphrase->generate_hash->plaintext
 
 Returns the plaintext password as originally supplied to the L<passphrase> keyword.
-Only works on an object as returned by C<generate_hash> when C<return_object> is true
 
-    passphrase('password')->generate_hash({return_object=>1})->plaintext;
+    passphrase('password')->generate_hash->plaintext;
 
 =cut
 
 sub plaintext {
-    return shift->{plaintext};
+    my $self = shift;
+
+    return undef unless $self->{plaintext};
+    return $self->{plaintext};
 }
 
 
@@ -429,11 +449,6 @@ sub _get_settings {
         $self->{cost} = sprintf("%02d", $self->{cost});
 
         $self->{salt} = _random_salt($self->{true_random_salt});
-    }
-
-    # Whether to return an object or rfc2307 string from generate_hash
-    if ($options->{return_object} // $plugin_setting->{return_object}) {
-        $self->{return_object} = 1;
     }
 
     return $self;
@@ -602,10 +617,6 @@ a strong psuedo-random salt.
             bcrypt:
                 cost: 8
 
-            MD5:
-                salt: 'application-wide salt'
-
-
 =head1 SEE ALSO
 
 L<Dancer>, L<Digest>, L<Crypt::Eksblowfish::Bcrypt>, L<Dancer::Plugin::Bcrypt>
@@ -626,7 +637,8 @@ It is not possible for this plugin to automagically work out the correct
 encoding for a given string.
 
 If you see errors like this, then you probably need to use the L<Encode> module
-to encode your text as UTF-8 before giving it to C<passphrase>.
+to encode your text as UTF-8 (or whatever encoding it is) before giving it 
+to C<passphrase>.
 
 Text encoding is a bag of hurt, and errors like this are probably indicitive
 of deeper problems within your app's code.
