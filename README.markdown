@@ -61,15 +61,10 @@ A cryptographically random salt is used if salt is not defined.
 Only if you specify the empty string will an empty salt be used
 This is not recommended, and should only be used to upgrade old insecure hashes
 
-If `return_object` is true, then an object is returned allowing you
-to access the components of the RFC 2307 hash individually. This is useful
-if you wish to store the salt and hash in different database columns.
-
     my $hash = passphrase('my password')->generate_hash({
-        scheme        => '', # What method we'll use to hash
-        cost          => '', # Cost / Work Factor if using bcrypt 
-        salt          => '', # Manually specify salt if using a salted digest
-        return_object => '', # Returns an object, rather than the rfc2307 string
+        scheme => '', # What method we'll use to hash
+        cost   => '', # Cost / Work Factor if using bcrypt 
+        salt   => '', # Manually specify salt if using a salted digest
     });
 
 ## passphrase->matches
@@ -124,73 +119,63 @@ used by passing a hashref of options.
 ## passphrase->generate_hash->rfc2307
 
 Returns the rfc2307 representation from a `Dancer::Plugin::Passphrase` object.
-Only works on an object as returned by `generate_hash` when `return_object` is true
-
-    passphrase('password')->generate_hash({return_object=>1})->rfc2307;
+Retu
+    passphrase('password')->generate_hash->rfc2307;
 
 ## passphrase->generate_hash->scheme
 
 Returns the scheme from a `Dancer::Plugin::Passphrase` object.
-Only works on an object as returned by `generate_hash` when `return_object` is true
 
-    passphrase('password')->generate_hash({return_object=>1})->scheme;
+    passphrase('password')->generate_hash->scheme;
 
 ## passphrase->generate_hash->cost
 
 Returns the bcrypt cost from a `Dancer::Plugin::Passphrase` object.
-Only works on an object as returned by `generate_hash` when `return_object` is true.
 Only works when using the bcrypt algorithm, returns undef for other algorithms
 
-    passphrase('password')->generate_hash({return_object=>1})->cost;
+    passphrase('password')->generate_hash->cost;
 
 ## passphrase->generate_hash->raw_salt
 
 Returns the raw salt from a `Dancer::Plugin::Passphrase` object.
-Only works on an object as returned by `generate_hash` when `return_object` is true
 
-    passphrase('password')->generate_hash({return_object=>1})->raw_salt;
+    passphrase('password')->generate_hash->raw_salt;
 
 ## passphrase->generate_hash->raw_hash
 
 Returns the raw hash from a `Dancer::Plugin::Passphrase` object.
-Only works on an object as returned by `generate_hash` when `return_object` is true
 
-    passphrase('password')->generate_hash({return_object=>1})->raw_hash;
+    passphrase('password')->generate_hash->raw_hash;
 
 ## passphrase->generate_hash->salt_hex
 
 Returns the hex-encoded salt from a `Dancer::Plugin::Passphrase` object.
-Only works on an object as returned by `generate_hash` when `return_object` is true
 
-    passphrase('password')->generate_hash({return_object=>1})->salt_hex;
+    passphrase('password')->generate_hash->salt_hex;
 
 ## passphrase->generate_hash->hash_hex
 
 Returns the hex-encoded hash from a `Dancer::Plugin::Passphrase` object.
-Only works on an object as returned by `generate_hash` when `return_object` is true
 
-    passphrase('password')->generate_hash({return_object=>1})->hash_hex;
+    passphrase('password')->generate_hash->hash_hex;
 
 ## passphrase->generate_hash->salt_base64
 
 Returns the base64 encoded salt from a `Dancer::Plugin::Passphrase` object.
-Only works on an object as returned by `generate_hash` when `return_object` is true
 
-    passphrase('password')->generate_hash({return_object=>1})->salt_base64;
+    passphrase('password')->generate_hash->salt_base64;
 
 ## passphrase->generate_hash->hash_base64
 
 Returns the base64 encoded hash from a `Dancer::Plugin::Passphrase` object.
-Only works on an object as returned by `generate_hash` when `return_object` is true
 
-    passphrase('password')->generate_hash({return_object=>1})->hash_base64;
+    passphrase('password')->generate_hash->hash_base64;
 
 ## passphrase->generate_hash->plaintext
 
 Returns the plaintext password as originally supplied to the [passphrase](http://search.cpan.org/perldoc?passphrase) keyword.
-Only works on an object as returned by `generate_hash` when `return_object` is true
 
-    passphrase('password')->generate_hash({return_object=>1})->plaintext;
+    passphrase('password')->generate_hash->plaintext;
 
 # DESCRIPTION
 
@@ -311,11 +296,6 @@ a strong psuedo-random salt.
             bcrypt:
                 cost: 8
 
-            MD5:
-                salt: 'application-wide salt'
-
-
-
 # SEE ALSO
 
 [Dancer](http://search.cpan.org/perldoc?Dancer), [Digest](http://search.cpan.org/perldoc?Digest), [Crypt::Eksblowfish::Bcrypt](http://search.cpan.org/perldoc?Crypt::Eksblowfish::Bcrypt), [Dancer::Plugin::Bcrypt](http://search.cpan.org/perldoc?Dancer::Plugin::Bcrypt)
@@ -330,19 +310,18 @@ or
 
     Input must contain only octets
 
-This means you will will probably have to use the [Encode](http://search.cpan.org/perldoc?Encode) module to
-encode the string in UTF-8 before passing it to the `passphrase` keyword.
-
-Both the MD5 and bcrypt algorithms can't handle chracters with an ordinal
+The MD5 and bcrypt algorithms can't handle chracters with an ordinal
 value above 255, and produce errors like this if they encounter them.
 It is not possible for this plugin to automagically work out the correct
 encoding for a given string.
 
 If you see errors like this, then you probably need to use the [Encode](http://search.cpan.org/perldoc?Encode) module
-to encode your text as UTF-8 before giving it to `passphrase`.
+to encode your text as UTF-8 (or whatever encoding it is) before giving it 
+to `passphrase`.
 
-Text encoding is a bag of hurt, and if you are seeing errors like this,
-it is probably indicitive of deeper problems within your app's code.
+Text encoding is a bag of hurt, and errors like this are probably indicitive
+of deeper problems within your app's code.
+
 You will probably save yourself a lot of hassle down the line if you read
 up on the [Encode](http://search.cpan.org/perldoc?Encode) module sooner rather than later.
 
