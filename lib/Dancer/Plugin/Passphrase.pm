@@ -402,13 +402,12 @@ sub _calculate_hash {
         $rfc2307_scheme = 'SHA'   if $rfc2307_scheme eq 'SHA1';
         $rfc2307_scheme = 'CRYPT' if $rfc2307_scheme eq 'BCRYPT';
 
-        if ($self->{prefix_salt} || $self->{salt}) {
+        if ($self->{salt}) {
             $rfc2307_scheme = 'S'.$rfc2307_scheme;
         }
 
         my $hash = Digest->new( $self->{scheme} );
 
-        # $hash->add($self->{prefix_salt}); # Not implimented yet
         $hash->add($self->{plaintext});
         $hash->add($self->{salt});
 
