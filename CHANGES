@@ -1,16 +1,40 @@
+1.1.0   2012-04-01
+
+    [ FEATURE ]
+    * Added support for scrypt algorithm, via Crypt::Scrypt and Digest::Scrypt
+    * Improved support for bcrypt using the new Digest::Bcrypt;
+
+    [ MISC ]
+    * Massive code refactor to make use of the new Digest::
+      version of scrypt and bcrypt
+
+1.0.1   2012-03-30
+
+    [ DOCUMENTATION ]
+    * Clarified documentation detailing what part of the object to store
+    * Added section with default lengths of RFC 2307 strings
+
+    [ BUGFIX ]
+    * Improved error handling when trying to use the matches() method
+      without providing a valid RFC 2307 string
+      
+
 1.0.0   2011-12-01
 
     [ FEATURE ]
     * Use overload to auto stringify the object to the rfc2307 representation
       This removes the need for the ugly { return_object => 1 } argument
       The { return_object => 1 } syntax is removed with immediate effect
-      If you used the { return_object => 1 } syntax, it will no longer
+      If you used the { return_object => 1 } syntax, it will no longer work.
+
       This is a backwards incompatible change. 
+
 
 0.1.1   2011-10-18
 
     [ BUGFIX ]
     * Made compatible with perl < 5.14
+
 
 0.1.0   2011-09-26
 
@@ -21,6 +45,7 @@
 
     [ TESTS ]
     * Added Test Suite
+
 
 0.0.1   2011-09-06
 
