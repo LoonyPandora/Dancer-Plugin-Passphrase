@@ -9,11 +9,11 @@ Dancer::Plugin::Passphrase - Passphrases and Passwords as objects for Dancer
 =head1 SYNOPSIS
 
 This plugin manages the hashing of passwords for Dancer apps, allowing 
-developers to follow best cryptography practice without having to 
+developers to follow cryptography best practices without having to 
 become a cryptography expert.
 
-It uses the bcrypt algorithm as the default, wrapping L<Crypt::Eksblowfish::Bcrypt>,
-and also supports any hashing function provided by L<Digest> 
+It uses the bcrypt algorithm as the default, wrapping L<Crypt::Eksblowfish::Bcrypt>, 
+while also supporting any hashing function provided by L<Digest> 
 
 =head1 USAGE
 
@@ -22,16 +22,20 @@ and also supports any hashing function provided by L<Digest>
     use Dancer::Plugin::Passphrase;
 
     post '/' sub => {
-        my $hash = passphrase( param('password') )->generate_hash;
+        my $phrase = passphrase( param('my password') )->generate;
 
-        # [...] Store $hash in DB
+        # $phrase is now an object that contains RFC 2307 representation
+        # of the hashed passphrase, along with the salt and the raw_hash
+        
+        # You should store $phrase->rfc2307() for use in the matches() method
     };
 
     get '/' sub => {
-        # [...] Retrieve $stored_hash from the DB
+        # Retrieve $stored_rfc_2307_string - which MUST be a valid RFC 2307
+        # string of the kind returned by the rfc2307() method
 
-        if ( passphrase( param('password') )->matches( $stored_hash ) ) {
-            # Password matches!
+        if ( passphrase( param('my password') )->matches( $stored_rfc_2307 ) ) {
+            # Passphrase matches!
         }
     };
 
@@ -53,7 +57,7 @@ use Data::Entropy::Source;
 use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
 
-our $VERSION = '1.0.0';
+our $VERSION = '1.1.0';
 
 # Auto stringifies and returns the RFC 2307 representation
 # of the object unless we are calling a method on it
@@ -85,32 +89,35 @@ sub passphrase {
 
 =head1 METHODS
 
-=head2 passphrase->generate_hash
+=head2 passphrase->generate
 
-Generates and returns an RFC 2307 representation of the hashed passphrase
+Generates an RFC 2307 representation of the hashed passphrase
 that is suitable for storage in a database.
 
-    my $hash = passphrase('my passphrase')->generate_hash;
+    my $pass = passphrase('my passphrase')->generate;
 
-You can pass a hashref of options to specify what kind of hash should be 
-generated, all options you can set in the config file are valid.
+You should store C<$phrase->rfc_2307()> in your database. For convenience
+the object will automagically return the RFC 2307 representation when no
+method is called on it.
 
-If you specify only the package name, the default settings
-for that package from your config file will be used.
+Accepts a hashref of options to specify what kind of hash should be 
+generated. All options settable in the config file are valid.
+
+If you specify only the scheme, the default settings for that scheme will be used.
 
 A cryptographically random salt is used if salt is not defined.
 Only if you specify the empty string will an empty salt be used
 This is not recommended, and should only be used to upgrade old insecure hashes
 
-    my $hash = passphrase('my password')->generate_hash({
-        scheme => '', # What method we'll use to hash
-        cost   => '', # Cost / Work Factor if using bcrypt 
-        salt   => '', # Manually specify salt if using a salted digest
+    my $phrase = passphrase('my password')->generate({
+        scheme => '',   # What method is used to generate the hash
+        cost   => '',   # Cost / Work Factor if using bcrypt 
+        salt   => '',   # Manually specify salt if using a salted digest
     });
 
 =cut
 
-sub generate_hash {
+sub generate {
     my ($self, $options) = @_;
 
     $self->_get_settings($options);
@@ -118,6 +125,9 @@ sub generate_hash {
 
     return $self;
 }
+
+# For backwards compatibility
+*generate_hash = \&generate;
 
 
 
@@ -128,11 +138,14 @@ Returns 1 if the hash of the password matches the stored hash.
 Returns undef if they don't match or if there was an error
 Fail-Secure, rather than Fail-Safe.
 
-    passphrase('my password')->matches($stored_hash);
+    passphrase('my password')->matches($stored_rfc_2307_string);
 
-$stored_hash must be a valid RFC 2307 string made up of a scheme identifier,
-followed by a base64 encoded string. The base64 encoded string should contain
-the password hash and the salt concatenated together in that order.
+$stored_rfc_2307_string B<MUST> be a valid RFC 2307 string,
+as created by L<generate()|/"passphrase__generate">
+
+An RFC 2307 string is made up of a scheme identifier, followed by a
+base64 encoded string. The base64 encoded string should contain
+the password hash and the salt concatenated together - in that order.
 
     '{'.$scheme.'}'.encode_base64($hash . $salt, '');
 
@@ -141,14 +154,11 @@ which are prefixed with an S.
 
     MD5 SHA SHA224 SHA256 SHA384 SHA512 CRYPT
 
-Any algorithm that can be produced by a module conforming to the
-L<Digest> spec will have it's own scheme, these are just the default ones
-
 A complete RFC2307 string looks like this:
 
     {SSHA}K3LAbIjRL5CpLzOlm3/HzS3qt/hUaGVTYWx0
 
-This module generates hashes in this format by default via C<generate_hash>.
+This is the format created by L<generate()|/"passphrase__generate">
 
 =cut
 
@@ -224,13 +234,13 @@ sub generate_random {
 
 
 
-=head1 ADDITIONAL
+=head1 ADDITIONAL METHODS
 
-=head2 passphrase->generate_hash->rfc2307
+=head2 passphrase->generate->rfc2307
 
 Returns the rfc2307 representation from a C<Dancer::Plugin::Passphrase> object.
-Retu
-    passphrase('password')->generate_hash->rfc2307;
+
+    passphrase('my password')->generate->rfc2307;
 
 =cut
 
@@ -241,12 +251,15 @@ sub rfc2307 {
     return $self->{rfc2307};
 }
 
+# For backwards compatibility
+*as_rfc2307 = \&rfc2307;
 
-=head2 passphrase->generate_hash->scheme
+
+=head2 passphrase->generate->scheme
 
 Returns the scheme from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('password')->generate_hash->scheme;
+    passphrase('my password')->generate->scheme;
 
 =cut
 
@@ -258,12 +271,12 @@ sub scheme {
 }
 
 
-=head2 passphrase->generate_hash->cost
+=head2 passphrase->generate->cost
 
 Returns the bcrypt cost from a C<Dancer::Plugin::Passphrase> object.
 Only works when using the bcrypt algorithm, returns undef for other algorithms
 
-    passphrase('password')->generate_hash->cost;
+    passphrase('my password')->generate->cost;
 
 =cut
 
@@ -275,11 +288,11 @@ sub cost {
 }
 
 
-=head2 passphrase->generate_hash->raw_salt
+=head2 passphrase->generate->raw_salt
 
 Returns the raw salt from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('password')->generate_hash->raw_salt;
+    passphrase('my password')->generate->raw_salt;
 
 =cut
 
@@ -291,11 +304,11 @@ sub raw_salt {
 }
 
 
-=head2 passphrase->generate_hash->raw_hash
+=head2 passphrase->generate->raw_hash
 
 Returns the raw hash from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('password')->generate_hash->raw_hash;
+    passphrase('my password')->generate->raw_hash;
 
 =cut
 
@@ -307,11 +320,11 @@ sub raw_hash {
 }
 
 
-=head2 passphrase->generate_hash->salt_hex
+=head2 passphrase->generate->salt_hex
 
 Returns the hex-encoded salt from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('password')->generate_hash->salt_hex;
+    passphrase('my password')->generate->salt_hex;
 
 =cut
 
@@ -323,11 +336,11 @@ sub salt_hex {
 }
 
 
-=head2 passphrase->generate_hash->hash_hex
+=head2 passphrase->generate->hash_hex
 
 Returns the hex-encoded hash from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('password')->generate_hash->hash_hex;
+    passphrase('my password')->generate->hash_hex;
 
 =cut
 
@@ -339,11 +352,11 @@ sub hash_hex {
 }
 
 
-=head2 passphrase->generate_hash->salt_base64
+=head2 passphrase->generate->salt_base64
 
 Returns the base64 encoded salt from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('password')->generate_hash->salt_base64;
+    passphrase('my password')->generate->salt_base64;
 
 =cut
 
@@ -355,11 +368,11 @@ sub salt_base64 {
 }
 
 
-=head2 passphrase->generate_hash->hash_base64
+=head2 passphrase->generate->hash_base64
 
 Returns the base64 encoded hash from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('password')->generate_hash->hash_base64;
+    passphrase('my password')->generate->hash_base64;
 
 =cut
 
@@ -370,11 +383,11 @@ sub hash_base64 {
     return encode_base64($self->{hash}, '');
 }
 
-=head2 passphrase->generate_hash->plaintext
+=head2 passphrase->generate->plaintext
 
 Returns the plaintext password as originally supplied to the L<passphrase> keyword.
 
-    passphrase('password')->generate_hash->plaintext;
+    passphrase('my password')->generate->plaintext;
 
 =cut
 
@@ -454,8 +467,8 @@ sub _get_settings {
 }
 
 
-# Generates 128 bits of entropy as a salt bcrypt requires exactly this amount
-# and it's a reasonable amount for other algorithms
+# Generates 128 bits of entropy to use as a salt. bcrypt requires
+# exactly this amount, and it's a reasonable amount for other algorithms
 sub _random_salt {
     my ($true_random_salt) = @_;
     my $entropy_source;
@@ -494,7 +507,7 @@ register_plugin;
 1;
 
 
-=head1 DESCRIPTION
+=head1 MORE INFORMATION
 
 =head2 Purpose
 
@@ -506,9 +519,8 @@ methods for securing user data, but succeed only in coming up with
 a system that has little real security.
 
 This plugin provides a simple way of managing that complexity, allowing 
-developers to follow best crypto practice without having to become a cryptography expert.
+developers to follow crypto best practice without having to become an expert.
 
-See the cookbook for some ideas on how to to move from older schemes.
 
 =head2 Rationale
 
@@ -533,10 +545,56 @@ SHA hashes is a very real problem that cannot be easily solved.
 
 Increasing the cost of generating a bcrypt hash is a trivial way to make 
 brute forcing ineffective. With a low cost setting, bcrypt is just as secure 
-as a more traditional SHA+salt scheme, and around the same speed.
+as a more traditional SHA+salt scheme, and just as fast. Increasing the cost
+as computers become more powerful keeps you one step ahead
 
 For a more detailed description of why bcrypt is preferred, see this article: 
 L<http://codahale.com/how-to-safely-store-a-password/>
+
+
+=head2 Configuration
+
+In your applications config file, you can set the default hashing algorithm,
+and the default settings for every supported algorithm. Calls to
+L<generate()|/"passphrase__generate"> will use the default settings
+for that algorithm specified in here.
+
+You can override these defaults when you call L<generate()|/"passphrase__generate">.
+
+If you do no configuration at all, the default is to bcrypt with a cost of 4, and 
+a strong psuedo-random salt.
+
+    plugins:
+        Passphrase:
+            default: bcrypt
+
+            bcrypt:
+                cost: 8
+
+
+=head2 Storage in a database
+
+You should be storing the RFC 2307 string in your database, it's the easiest way
+to use this module. You could store the C<raw_salt>, C<raw_hash>, and C<scheme>
+separately, but this strongly discouraged. RFC 2307 strings are specifically
+designed for storing hashed passwords, and should always be used.
+
+The length of the string produced by L<generate()|/"passphrase__generate"> can
+vary dependent on your settings. Below is a table of the lengths generated
+using default settings.
+
+You will need to make sure your database columns are at least this long.
+If the string gets truncated, the password can I<never> be validated.
+
+    SCHEME      LENGTH  EXAMPLE RFC 2307 STRING
+
+    CRYPT       68      {CRYPT}$2a$04$MjkMhQxasFQod1qq56DXCOvWu6YTWk9X.EZGnmSSIbbtyEBIAixbS
+    SSHA512     118     {SSHA512}lZG4dZ5EU6dPEbJ1kBPPzEcupFloFSIJjiXCwMVxJXOy/x5qhBA5XH8FiUWj7u59onQxa97xYdqje/fwY5TDUcW1Urplf3KHMo9NO8KO47o=
+    SSHA384     98      {SSHA384}SqZF5YYyk4NdjIM8YgQVfRieXDxNG0dKH4XBcM40Eblm+ribCzdyf0JV7i2xJvVHZsFSQNcuZPKtiTMzDyOU+w==
+    SSHA256     74      {SSHA256}xsJHNzPlNCpOZ41OkTfQOU35ZY+nRyZFaM8lHg5U2pc0xT3DKNlGW2UTY0NPYsxU
+    SSHA224     70      {SSHA224}FTHNkvKOdyX1d6f45iKLVxpaXZiHel8pfilUT1dIZ5u+WIUyhDGxLnx72X0=
+    SSHA        55      {SSHA}Qsaao/Xi/bYTRMQnpHuD3y5nj02wbdcw5Cek2y2nLs3pIlPh
+    SMD5        51      {SMD5}bgfLiUQWgzUm36+nBhFx62bi0xdwTp+UpEeNKDxSLfM=
 
 =head2 Common Mistakes
 
@@ -598,28 +656,6 @@ you to validate old passphrases
 =back
 
 
-=head1 CONFIGURATION
-
-In your applications config file, you can set the default hashing algorithm,
-and the default settings for every supported algorithm. Calls to C<generate_hash>
-will use the default settings for that algorithm specified in here.
-
-You can override these defaults when you call C<generate_hash>.
-
-If you do no configuration at all, the default is to bcrypt with a cost of 4, and 
-a strong psuedo-random salt.
-
-    plugins:
-        Passphrase:
-            default: bcrypt
-
-            bcrypt:
-                cost: 8
-
-=head1 SEE ALSO
-
-L<Dancer>, L<Digest>, L<Crypt::Eksblowfish::Bcrypt>, L<Dancer::Plugin::Bcrypt>
-
 =head1 KNOWN ISSUES
 
 If you see errors like this
@@ -630,8 +666,8 @@ or
 
     Input must contain only octets
 
-The MD5 and bcrypt algorithms can't handle chracters with an ordinal
-value above 255, and produce errors like this if they encounter them.
+The C<MD5> and C<bcrypt> algorithms can't handle chracters with an ordinal
+value above 255, producing errors like this if they encounter them.
 It is not possible for this plugin to automagically work out the correct
 encoding for a given string.
 
@@ -642,20 +678,26 @@ to C<passphrase>.
 Text encoding is a bag of hurt, and errors like this are probably indicitive
 of deeper problems within your app's code.
 
-You will probably save yourself a lot of hassle down the line if you read
-up on the L<Encode> module sooner rather than later.
+You will save yourself a lot of trouble if you read up on the
+L<Encode> module sooner rather than later.
 
 For further reading on UTF-8, unicode, and text encoding in perl,
 see L<http://training.perl.com/OSCON2011/index.html>
+
+
+=head1 SEE ALSO
+
+L<Dancer>, L<Digest>, L<Crypt::Eksblowfish::Bcrypt>, L<Dancer::Plugin::Bcrypt>
 
 
 =head1 AUTHOR
 
 James Aitken <jaitken@cpan.org>
 
+
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2011 by James Aitken.
+This software is copyright (c) 2012 by James Aitken.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
