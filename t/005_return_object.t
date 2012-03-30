@@ -7,7 +7,7 @@ use Dancer::Plugin::Passphrase;
 
 my $secret = "Super Secret Squirrel";
 
-my $object = passphrase($secret)->generate_hash;
+my $object = passphrase($secret)->generate;
 
 ok(ref($object) eq 'Dancer::Plugin::Passphrase',  'Creates correct object');
 ok($object->rfc2307,                              'Contains RFC 2307 representation');

@@ -7,8 +7,8 @@ use Dancer::Plugin::Passphrase;
 
 my $secret = "Super Secret Squirrel";
 
-my $default_hash = passphrase($secret)->generate_hash;
+my $rfc2307 = passphrase($secret)->generate;
 
-like($default_hash, qr/^{CRYPT}\$2a\$04\$/,      'RFC compliant hash generated');
-ok(passphrase($secret)->matches($default_hash),  'Match plaintext to hash');
-ok(!passphrase('WRONG')->matches($default_hash), 'Incorrect passwords should be rejected');
+like($rfc2307, qr/^{CRYPT}\$2a\$04\$/,      'RFC compliant hash generated');
+ok(passphrase($secret)->matches($rfc2307),  'Match plaintext to hash');
+ok(!passphrase('WRONG')->matches($rfc2307), 'Incorrect passwords should be rejected');
