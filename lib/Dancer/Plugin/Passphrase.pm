@@ -149,10 +149,10 @@ the password hash and the salt concatenated together - in that order.
 
     '{'.$scheme.'}'.encode_base64($hash . $salt, '');
 
-Where C<$scheme> can be any of the following and their salted variants,
-which are prefixed with an S.
+Where C<$scheme> can be any of the following and their unsalted variants,
+which have the leading S removed. CRYPT is always salted.
 
-    MD5 SHA SHA224 SHA256 SHA384 SHA512 CRYPT
+    SMD5 SSHA SSHA224 SSHA256 SSHA384 SSHA512 CRYPT
 
 A complete RFC2307 string looks like this:
 
@@ -165,6 +165,10 @@ This is the format created by L<generate()|/"passphrase__generate">
 sub matches {
     my ($self, $stored_hash) = @_;
     my ($rfc2307_scheme, $salt_and_digest) = ($stored_hash =~ m/^{(\w+)}(.*)/s);
+
+    if (!$rfc2307_scheme || !$salt_and_digest) {
+        die "An RFC 2307 compliant string must be passed to matches()";
+    }
 
     if ($rfc2307_scheme eq 'CRYPT') {
         my $calculated_hash = bcrypt($self->{plaintext}, $salt_and_digest);
@@ -184,8 +188,9 @@ sub matches {
             $digest    = decode_base64($salt_and_digest);
             $algorithm = $rfc2307_scheme;
         }
-                
-        $algorithm =~ s/SHA/SHA-/; # / syntax highlighting bug
+
+        # Digest:: module names have dashes in them. $scheme names do not.
+        $algorithm =~ s/SHA/SHA-/;
         $algorithm = 'SHA-1' if $algorithm eq 'SHA-';
         $algorithm = ucfirst lc $algorithm if $algorithm eq 'WHIRLPOOL';
 
