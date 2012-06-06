@@ -1,8 +1,9 @@
-use Test::More import => ['!pass'],  tests => 4;
+use Test::More tests => 4;
 
 use strict;
 use warnings;
 
+use Dancer qw(:tests);
 use Dancer::Plugin::Passphrase;
 use Encode;
 

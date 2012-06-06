@@ -1,8 +1,9 @@
-use Test::More import => ['!pass'],  tests => 3;
+use Test::More tests => 3;
 
 use strict;
 use warnings;
 
+use Dancer qw(:tests);
 use Dancer::Plugin::Passphrase;
 
 my $with_defaults   = passphrase->generate_random;

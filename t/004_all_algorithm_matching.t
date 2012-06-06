@@ -1,8 +1,9 @@
-use Test::More import => ['!pass'],  tests => 16;
+use Test::More tests => 16;
 
 use strict;
 use warnings;
 
+use Dancer qw(:tests);
 use Dancer::Plugin::Passphrase;
 
 my $secret = "Super Secret Squirrel";
