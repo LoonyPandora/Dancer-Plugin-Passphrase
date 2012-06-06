@@ -67,7 +67,7 @@ our $VERSION = '1.1.0';
 # Auto stringifies and returns the RFC 2307 representation
 # of the object unless we are calling a method on it
 use overload (
-    '""' => 'rfc2307'
+    '""' => 'rfc2307',
 );
 
 register passphrase => \&passphrase;
@@ -169,51 +169,17 @@ This is the format created by L<generate()|/"passphrase__generate">
 
 sub matches {
     my ($self, $stored_hash) = @_;
-    my ($rfc2307_scheme, $salt_and_digest) = ($stored_hash =~ m/^{(\w+)}(.*)/s);
 
-    if (!$rfc2307_scheme || !$salt_and_digest) {
-        die "An RFC 2307 compliant string must be passed to matches()";
+    # Force auto stringification in case we were passed an object.
+    ($stored_hash) = ($stored_hash =~ m/(.*)/s);
+
+    my $new_hash = $self->_extract_settings($stored_hash)->_calculate_hash->rfc2307;
+
+    if ($new_hash eq $stored_hash) {
+        return 1;    
     }
 
-    # $self->_get_settings({
-    #     algorithm => '', 
-    #     salt => '',
-    #     cost => '',
-    # });
-
-    if ($rfc2307_scheme eq 'CRYPT') {
-        my $calculated_hash = bcrypt($self->{plaintext}, $salt_and_digest);
-
-        return 1 if $salt_and_digest eq $calculated_hash;        
-        return undef;
-    } else {
-        my ($salt, $digest, $algorithm);
-
-        if (_salt_offset()->{$rfc2307_scheme}) {
-            $salt      = substr(decode_base64($salt_and_digest),    _salt_offset()->{$rfc2307_scheme});
-            $digest    = substr(decode_base64($salt_and_digest), 0, _salt_offset()->{$rfc2307_scheme});
-            $algorithm = $rfc2307_scheme;
-            $algorithm =~ s/^S//;
-        } else {
-            $salt      = '';
-            $digest    = decode_base64($salt_and_digest);
-            $algorithm = $rfc2307_scheme;
-        }
-
-        # Digest:: module names have dashes in them. $scheme names do not.
-        $algorithm =~ s/SHA/SHA-/;
-        $algorithm = 'SHA-1' if $algorithm eq 'SHA-';
-        $algorithm = ucfirst lc $algorithm if $algorithm eq 'WHIRLPOOL';
-
-        $self->{salt}   = $salt;
-        $self->{scheme} = $algorithm;
-
-        $self->_calculate_hash();
-
-        return 1 if $self->raw_hash eq $digest;
-        return undef
-    }
-
+    return undef;
 }
 
 
@@ -457,10 +423,15 @@ sub _calculate_hash {
                 . _en_bcrypt_base64($self->{hash});
         }
         when ('PBKDF2') {
+            $hasher->add($self->{plaintext});
             $hasher->salt($self->raw_salt);
+            # $hasher->iterations($self->iterations);
 
-            $self->{hash} = $hasher->clone->digest;
-            $self->{rfc2307} = '{CRYPT}' . $hasher->as_crypt;
+            $self->{hash} = $hasher->digest;
+            $self->{rfc2307}
+                = '{CRYPT}$PBKDF2$HMACSHA1:1000:'
+                . encode_base64($self->raw_salt, '') . '$'
+                . encode_base64($self->{hash},   '');
         }
         default {
             $hasher->add($self->{plaintext});
@@ -484,90 +455,53 @@ sub _extract_settings {
     my ($scheme, $settings) = ($rfc2307_string =~ m/^{(\w+)}(.*)/s);
 
     unless ($scheme && $settings) {
-        die "I RFC 2307 compliant string must be passed to matches()";
+        die "An RFC 2307 compliant string must be passed to matches()";
     }
-    
-    my %options;
-    given ($scheme) {
-        when ('MD5')     { $options{algorithm} = 'MD5';     }
-        when ('SMD5')    { $options{algorithm} = 'MD5';     }
-        when ('SHA')     { $options{algorithm} = 'SHA-1';   }
-        when ('SSHA')    { $options{algorithm} = 'SHA-1';   }
-        when ('SHA224')  { $options{algorithm} = 'SHA-224'; }
-        when ('SSHA224') { $options{algorithm} = 'SHA-224'; }
-        when ('SHA256')  { $options{algorithm} = 'SHA-256'; }
-        when ('SSHA256') { $options{algorithm} = 'SHA-256'; }
-        when ('SHA384')  { $options{algorithm} = 'SHA-384'; }
-        when ('SSHA384') { $options{algorithm} = 'SHA-384'; }
-        when ('SHA512')  { $options{algorithm} = 'SHA-512'; }
-        when ('SSHA512') { $options{algorithm} = 'SHA-512'; }
-        when ('CRYPT')   {
-            
-            if ($settings =~ m{^\$PBKDF2\$}) {
-                $options{algorithm} = 'PBKDF2';
-                return;
+
+    if ($scheme eq 'CRYPT'){
+        given ($settings) {
+            when (/^\$2a\$/)     {
+                $scheme = 'Bcrypt';
+                $settings =~ m{\A\$2a\$([0-9]{2})\$([./A-Za-z0-9]{22})}x;
+
+                ($self->{cost}, $self->{salt}) = ($1, _de_bcrypt_base64($2));
             }
+            when (/^\$PBKDF2\$/) {
+                $scheme = 'PBKDF2';
+                $settings =~ m{\A\$PBKDF2\$HMACSHA1:([0-9]{2,4}):([+/=A-Za-z0-9]+)\$}x;
 
-            my (undef, $cost, $salt_and_digest) = split '$', $settings;
-            $options{algorithm} = 'Bcrypt';
-            
+                ($self->{iterations}, $self->{salt}) = ($1, decode_base64($2));
+            }
+            default { die "Unknown CRYPT format: $_"; }
         }
     }
-    
-    
-    
-    if ($scheme eq 'CRYPT') {
-        my ($algorithm, $cost, ) = split('$', $salt_and_digest);
+
+    my $scheme_meta = {
+        'MD5'     => { algorithm => 'MD5',     salt => '', },
+        'SMD5'    => { algorithm => 'MD5',     },
+        'SHA'     => { algorithm => 'SHA-1',   salt => '', },
+        'SSHA'    => { algorithm => 'SHA-1',   },
+        'SHA224'  => { algorithm => 'SHA-224', salt => '', },
+        'SSHA224' => { algorithm => 'SHA-224', },
+        'SHA256'  => { algorithm => 'SHA-256', salt => '', },
+        'SSHA256' => { algorithm => 'SHA-256', },
+        'SHA384'  => { algorithm => 'SHA-384', salt => '', },
+        'SSHA384' => { algorithm => 'SHA-384', },
+        'SHA512'  => { algorithm => 'SHA-512', salt => '', },
+        'SSHA512' => { algorithm => 'SHA-512', },
+        'PBKDF2'  => { algorithm => 'PBKDF2',  },
+        'Bcrypt'  => { algorithm => 'Bcrypt',  },
+    };
+
+    $self->{scheme} = $scheme;
+    $self->{algorithm} = $scheme_meta->{$scheme}->{algorithm};
+    $self->{algorithm_meta} = $self->_hash_size;
+
+    if (!defined $self->{salt}) {
+        $self->{salt} = substr(decode_base64($settings), $self->{algorithm_meta}->{octets});    
     }
-    
 
-    # {CRYPT}$PBKDF2$HMACSHA1:1000:u4aTv1JvAC7hmVSBbpgUZw==$h5sARi+Z4ovwTRSLgHOHz31/QLc= at t/004_all_algorithm_matching.t line 13.
-    # {CRYPT}$2a$04$UAnrOCQbaY56OWqgR6BSNeI.txTWw7OyN704EwO6k8AzxVJ4k1sQ2 at t/004_all_algorithm_matching.t line 13.
-
-
-    $self->_get_settings({
-        algorithm => '',
-        salt      => '',
-        cost      => '',
-    });
-=cut
-    if ($scheme eq 'CRYPT') {
-        my $calculated_hash = bcrypt($self->{plaintext}, $salt_and_digest);
-
-        return 1 if $salt_and_digest eq $calculated_hash;        
-        return undef;
-    } else {
-        my ($salt, $digest, $algorithm);
-
-        if (_salt_offset()->{$rfc2307_scheme}) {
-            $salt      = substr(decode_base64($salt_and_digest),    _salt_offset()->{$rfc2307_scheme});
-            $digest    = substr(decode_base64($salt_and_digest), 0, _salt_offset()->{$rfc2307_scheme});
-            $algorithm = $rfc2307_scheme;
-            $algorithm =~ s/^S//;
-        } else {
-            $salt      = '';
-            $digest    = decode_base64($salt_and_digest);
-            $algorithm = $rfc2307_scheme;
-        }
-
-        # Digest:: module names have dashes in them. $scheme names do not.
-        $algorithm =~ s/SHA/SHA-/;
-        $algorithm = 'SHA-1' if $algorithm eq 'SHA-';
-        $algorithm = ucfirst lc $algorithm if $algorithm eq 'WHIRLPOOL';
-
-        $self->{salt}   = $salt;
-        $self->{scheme} = $algorithm;
-
-        $self->_calculate_hash();
-
-        return 1 if $self->raw_hash eq $digest;
-        return undef
-    }
-=cut
-
-
-
-
+    return $self;
 }
 
 
@@ -620,37 +554,8 @@ sub _get_settings {
 sub _generate_salt {
     my $self = shift;
 
-    my $salt_size = $self->_hash_size();
-
-    # This is truly random, but potentially blocks - hence it's not the default
-    my $entropy_source;
-    if ($self->{true_random_salt}) {
-        $entropy_source = Data::Entropy::Source->new(
-            Data::Entropy::RawSource::Local->new, 'sysread'
-        );
-    }
-
-    return with_entropy_source $entropy_source, sub {
-        entropy_source->get_bits($salt_size);
-    };
+    entropy_source->get_bits($self->_hash_size->{bits});
 }
-
-
-# Length of a hash in octets. Used to separate salt from a hash
-sub _salt_offset {
-    return {
-        'SMD5'       => 128 / 8,
-        'SSHA'       => 160 / 8,
-        'SSHA224'    => 224 / 8,
-        'SSHA256'    => 256 / 8,
-        'SSHA384'    => 384 / 8,
-        'SSHA512'    => 512 / 8,
-    };
-}
-
-
-
-
 
 
 
@@ -662,25 +567,6 @@ sub _hash_size {
     my $self = shift;
 
     my $sizes = {
-        'MD5'     => 128,
-        'SHA-1'   => 160,
-        'SHA-224' => 224,
-        'SHA-256' => 256,
-        'SHA-384' => 384,
-        'SHA-512' => 512,
-        'PBKDF2'  => 128,
-        'Bcrypt'  => 128,
-    };
-
-    return $sizes->{$self->algorithm};
-}
-
-
-
-sub _scheme_info {
-    my $self = shift;
-
-    my $algorithm = {
         'MD5'     => { bits => 128, octets => 128 / 8 },
         'SHA-1'   => { bits => 160, octets => 160 / 8 },
         'SHA-224' => { bits => 224, octets => 224 / 8 },
@@ -691,28 +577,8 @@ sub _scheme_info {
         'Bcrypt'  => { bits => 128, octets => 128 / 8 },
     };
 
-
-    $self->{algorithm_meta} = $algorithm->{$self->{algorithm}};
-
-    my $scheme = {
-        'MD5'     => $algorithm->{'MD5'},
-        'SMD5'    => $algorithm->{'MD5'},
-        'SHA'     => $algorithm->{'SHA-1'},
-        'SSHA'    => $algorithm->{'SHA-1'},
-        'SHA224'  => $algorithm->{'SHA-224'},
-        'SSHA224' => $algorithm->{'SHA-224'},
-        'SHA256'  => $algorithm->{'SHA-256'},
-        'SSHA256' => $algorithm->{'SHA-256'},
-        'SHA384'  => $algorithm->{'SHA-384'},
-        'SSHA384' => $algorithm->{'SHA-384'},
-        'SHA512'  => $algorithm->{'SHA-512'},
-        'SSHA512' => $algorithm->{'SHA-512'},
-        'PBKDF2'  => $algorithm->{'PBKDF2'},
-        'Bcrypt'  => $algorithm->{'Bcrypt'},
-    };
-
+    return $sizes->{$self->algorithm};
 }
-
 
 
 # From Crypt::Eksblowfish::Bcrypt;
