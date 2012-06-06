@@ -1,4 +1,4 @@
-use Test::More import => ['!pass'],  tests => 11;
+use Test::More import => ['!pass'],  tests => 14;
 
 use strict;
 use warnings;
@@ -20,3 +20,12 @@ ok($object->raw_salt,                             'Contains raw salt');
 ok($object->salt_hex,                             'Contains hex salt');
 ok($object->salt_base64,                          'Contains base64 salt');
 ok($object->plaintext eq $secret,                 'Contains correct plaintext');
+
+
+
+
+
+my $saltless_object = passphrase($secret)->generate({ algorithm => 'SHA-1', salt => '' });
+ok(defined $saltless_object->raw_salt,            'Contains a defined, but empty raw salt');
+ok(defined $saltless_object->salt_hex,            'Contains a defined, but empty  hex salt');
+ok(defined $saltless_object->salt_base64,         'Contains a defined, but empty  base64 salt');
