@@ -21,7 +21,7 @@ while also supporting any hashing function provided by L<Digest>
     use Dancer ':syntax';
     use Dancer::Plugin::Passphrase;
 
-    post '/' sub => {
+    post '/login' sub => {
         my $phrase = passphrase( param('my password') )->generate;
 
         # $phrase is now an object that contains RFC 2307 representation
@@ -30,7 +30,7 @@ while also supporting any hashing function provided by L<Digest>
         # You should store $phrase->rfc2307() for use in the matches() method
     };
 
-    get '/' sub => {
+    get '/protected' sub => {
         # Retrieve $stored_rfc_2307_string - which MUST be a valid RFC 2307
         # string of the kind returned by the rfc2307() method
 
@@ -46,10 +46,13 @@ while also supporting any hashing function provided by L<Digest>
 =cut
 
 use strict;
+use feature 'switch';
 
 use Dancer::Plugin;
 
 use Crypt::Eksblowfish::Bcrypt qw(bcrypt en_base64 de_base64);
+use Carp qw(carp croak);
+use Data::Dump qw(dump);
 use Data::Entropy qw(entropy_source with_entropy_source);
 use Data::Entropy::Algorithms qw(rand_bits rand_int);
 use Data::Entropy::RawSource::Local;
@@ -241,7 +244,7 @@ sub generate_random {
 
 =head1 ADDITIONAL METHODS
 
-=head2 passphrase->generate->rfc2307
+=head2 rfc2307
 
 Returns the rfc2307 representation from a C<Dancer::Plugin::Passphrase> object.
 
@@ -260,9 +263,11 @@ sub rfc2307 {
 *as_rfc2307 = \&rfc2307;
 
 
-=head2 passphrase->generate->scheme
+=head2 scheme
 
-Returns the scheme from a C<Dancer::Plugin::Passphrase> object.
+Returns the scheme name from a C<Dancer::Plugin::Passphrase> object.
+
+This is the scheme name as used in the RFC 2307 representation
 
     passphrase('my password')->generate->scheme;
 
@@ -276,7 +281,27 @@ sub scheme {
 }
 
 
-=head2 passphrase->generate->cost
+=head2 algorithm
+
+Returns the algorithm name from a C<Dancer::Plugin::Passphrase> object.
+
+This is the algorithm in the C<Digest::> namespace that was used to 
+generate the hash.
+
+    passphrase('my password')->generate->algorithm;
+
+=cut
+
+sub scheme {
+    my $self = shift;
+
+    return undef unless $self->{scheme};
+    return $self->{scheme};
+}
+
+
+
+=head2 cost
 
 Returns the bcrypt cost from a C<Dancer::Plugin::Passphrase> object.
 Only works when using the bcrypt algorithm, returns undef for other algorithms
@@ -293,7 +318,7 @@ sub cost {
 }
 
 
-=head2 passphrase->generate->raw_salt
+=head2 raw_salt
 
 Returns the raw salt from a C<Dancer::Plugin::Passphrase> object.
 
@@ -309,7 +334,7 @@ sub raw_salt {
 }
 
 
-=head2 passphrase->generate->raw_hash
+=head2 raw_hash
 
 Returns the raw hash from a C<Dancer::Plugin::Passphrase> object.
 
@@ -325,7 +350,7 @@ sub raw_hash {
 }
 
 
-=head2 passphrase->generate->salt_hex
+=head2 salt_hex
 
 Returns the hex-encoded salt from a C<Dancer::Plugin::Passphrase> object.
 
@@ -341,7 +366,7 @@ sub salt_hex {
 }
 
 
-=head2 passphrase->generate->hash_hex
+=head2 hash_hex
 
 Returns the hex-encoded hash from a C<Dancer::Plugin::Passphrase> object.
 
@@ -357,7 +382,7 @@ sub hash_hex {
 }
 
 
-=head2 passphrase->generate->salt_base64
+=head2 salt_base64
 
 Returns the base64 encoded salt from a C<Dancer::Plugin::Passphrase> object.
 
@@ -373,7 +398,7 @@ sub salt_base64 {
 }
 
 
-=head2 passphrase->generate->hash_base64
+=head2 hash_base64
 
 Returns the base64 encoded hash from a C<Dancer::Plugin::Passphrase> object.
 
@@ -388,7 +413,7 @@ sub hash_base64 {
     return encode_base64($self->{hash}, '');
 }
 
-=head2 passphrase->generate->plaintext
+=head2 plaintext
 
 Returns the plaintext password as originally supplied to the L<passphrase> keyword.
 
@@ -409,20 +434,74 @@ sub plaintext {
 sub _calculate_hash {
     my $self = shift;
 
+    # All supported hash schemes
+    if ($self->{scheme} ~~ [qw(MD5 SHA-1 SHA-224 SHA-256 SHA-384 SHA-512 BCRYPT)]) {
+        carp "Boo - $self->{scheme}";
+    } else {
+        carp "FOO - $self->{scheme}";
+    }
+
+    # Be extra nice, and accept bcrypt case insensitvely
+    $self->{scheme} = 'Bcrypt' if $self->{scheme} =~ m/bcrypt/i;
+    
+    
+    
+    
+    
+    my $rfc2307_scheme = uc $self->{scheme};
+    $rfc2307_scheme =~ s/\W+//;
+
+
+    my $hash = Digest->new( $self->{scheme} );
+
+
+    given ($self->{scheme}) {
+        when ('Bcrypt') {
+            $hash->salt($self->{salt});
+            $hash->cost($self->{cost});
+        }
+        when ('PBKDF2') {
+            $hash->salt($self->{salt});
+            $hash->cost($self->{cost});
+        }
+        default {
+            $hash->add($self->{plaintext});
+            $hash->add($self->{salt});
+        }
+    }
+
+    
+
+
+    # $self->{hash}    = $hash->digest;
+    # $self->{rfc2307} = '{'.$rfc2307_scheme.'}'.
+    #                    encode_base64($self->{hash}.$self->{salt}, '');
+
+    # carp $self->scheme . " - " . $hash->hexdigest;
+
+
     if (uc $self->{scheme} eq 'BCRYPT') {    
         my $template     = join('$', '$2a', $self->{cost}, en_base64($self->{salt}));
         $self->{hash}    = bcrypt($self->{plaintext}, $template);
+        # carp dump $self;
         $self->{rfc2307} = '{CRYPT}'.$self->{hash};
     } else {
         my $rfc2307_scheme = uc $self->{scheme};
         $rfc2307_scheme =~ s/\W+//;
 
+
         $rfc2307_scheme = 'SHA'   if $rfc2307_scheme eq 'SHA1';
         $rfc2307_scheme = 'CRYPT' if $rfc2307_scheme eq 'BCRYPT';
+
+
+        # $rfc2307_scheme;
+
 
         if ($self->{salt}) {
             $rfc2307_scheme = 'S'.$rfc2307_scheme;
         }
+
+        # carp $self->{scheme};
 
         my $hash = Digest->new( $self->{scheme} );
 
