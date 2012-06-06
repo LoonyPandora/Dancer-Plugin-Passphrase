@@ -52,17 +52,15 @@ use lib '/Users/james/Sites/Digest-PBKDF2/lib';
 
 use Dancer::Plugin;
 
-use Crypt::Eksblowfish::Bcrypt qw(bcrypt en_base64 de_base64);
-use Carp qw(carp croak);
+# use Crypt::Eksblowfish::Bcrypt qw(bcrypt en_base64 de_base64);
+use Carp qw(croak);
 use Data::Dump qw(dump);
-use Data::Entropy qw(entropy_source with_entropy_source);
+use Data::Entropy qw(entropy_source);
 use Data::Entropy::Algorithms qw(rand_bits rand_int);
-use Data::Entropy::RawSource::Local;
-use Data::Entropy::Source;
 use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
 
-our $VERSION = '1.1.0';
+our $VERSION = '2.0.0';
 
 # Auto stringifies and returns the RFC 2307 representation
 # of the object unless we are calling a method on it
@@ -92,9 +90,9 @@ sub passphrase {
 
 
 
-=head1 METHODS
+=head1 MAIN METHODS
 
-=head2 passphrase->generate
+=head2 generate
 
 Generates an RFC 2307 representation of the hashed passphrase
 that is suitable for storage in a database.
@@ -132,7 +130,8 @@ sub generate {
 }
 
 
-=head2 passphrase->matches
+
+=head2 matches
 
 Matches a plaintext password against a stored hash.
 Returns 1 if the hash of the password matches the stored hash.
@@ -176,7 +175,7 @@ sub matches {
 
 
 
-=head2 passphrase->generate_random
+=head2 generate_random
 
 Generates and returns any number of cryptographically random
 characters from the url-safe base64 charater set.
@@ -210,6 +209,13 @@ sub generate_random {
 
 =head1 ADDITIONAL METHODS
 
+The methods are only applicable once you have called C<generate>
+
+    passphrase( 'my password' )->generate->rfc2307; # CORRECT
+
+    passphrase( 'my password' )->rfc2307;           # INCORRECT, Returns undef
+
+
 =head2 rfc2307
 
 Returns the rfc2307 representation from a C<Dancer::Plugin::Passphrase> object.
@@ -232,6 +238,12 @@ This is the scheme name as used in the RFC 2307 representation
 
     passphrase('my password')->generate->scheme;
 
+The scheme name can be any of the following, and will always be 
+capitalized
+
+    SMD5  SSHA  SSHA224  SSHA256  SSHA384  SSHA512  CRYPT
+    MD5   SHA   SHA224   SHA256   SHA384   SHA512
+
 =cut
 
 sub scheme {
@@ -243,8 +255,8 @@ sub scheme {
 
 Returns the algorithm name from a C<Dancer::Plugin::Passphrase> object.
 
-This is the algorithm in the C<Digest::> namespace that was used to 
-generate the hash.
+The algorithm name can be anything that is accepted by C<Digest->new($alg)>
+This includes any modules in the C<Digest::> Namespace
 
     passphrase('my password')->generate->algorithm;
 
@@ -303,11 +315,10 @@ sub raw_hash {
 
 Returns the hex-encoded salt from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('my password')->generate->salt_hex;
-
 Can be defined, but false - The empty string is technically a valid salt.
-
 Returns C<undef> if there is no salt.
+
+    passphrase('my password')->generate->salt_hex;
 
 =cut
 
@@ -333,11 +344,10 @@ sub hash_hex {
 
 Returns the base64 encoded salt from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('my password')->generate->salt_base64;
-
 Can be defined, but false - The empty string is technically a valid salt.
-
 Returns C<undef> if there is no salt.
+
+    passphrase('my password')->generate->salt_base64;
 
 =cut
 
@@ -394,7 +404,6 @@ sub _calculate_hash {
         when ('PBKDF2') {
             $hasher->add($self->{plaintext});
             $hasher->salt($self->raw_salt);
-            # $hasher->iterations($self->iterations);
 
             $self->{hash} = $hasher->digest;
             $self->{rfc2307}
@@ -424,7 +433,7 @@ sub _extract_settings {
     my ($scheme, $settings) = ($rfc2307_string =~ m/^{(\w+)}(.*)/s);
 
     unless ($scheme && $settings) {
-        die "An RFC 2307 compliant string must be passed to matches()";
+        croak "An RFC 2307 compliant string must be passed to matches()";
     }
 
     if ($scheme eq 'CRYPT'){
@@ -441,29 +450,22 @@ sub _extract_settings {
 
                 ($self->{iterations}, $self->{salt}) = ($1, decode_base64($2));
             }
-            default { die "Unknown CRYPT format: $_"; }
+            default { croak "Unknown CRYPT format: $_"; }
         }
     }
 
     my $scheme_meta = {
-        'MD5'     => { algorithm => 'MD5',     salt => '', },
-        'SMD5'    => { algorithm => 'MD5',     },
-        'SHA'     => { algorithm => 'SHA-1',   salt => '', },
-        'SSHA'    => { algorithm => 'SHA-1',   },
-        'SHA224'  => { algorithm => 'SHA-224', salt => '', },
-        'SSHA224' => { algorithm => 'SHA-224', },
-        'SHA256'  => { algorithm => 'SHA-256', salt => '', },
-        'SSHA256' => { algorithm => 'SHA-256', },
-        'SHA384'  => { algorithm => 'SHA-384', salt => '', },
-        'SSHA384' => { algorithm => 'SHA-384', },
-        'SHA512'  => { algorithm => 'SHA-512', salt => '', },
-        'SSHA512' => { algorithm => 'SHA-512', },
-        'PBKDF2'  => { algorithm => 'PBKDF2',  },
-        'Bcrypt'  => { algorithm => 'Bcrypt',  },
+        'MD5'     => 'MD5',         'SMD5'    => 'MD5',
+        'SHA'     => 'SHA-1',       'SSHA'    => 'SHA-1',
+        'SHA224'  => 'SHA-224',     'SSHA224' => 'SHA-224',
+        'SHA256'  => 'SHA-256',     'SSHA256' => 'SHA-256',
+        'SHA384'  => 'SHA-384',     'SSHA384' => 'SHA-384',
+        'SHA512'  => 'SHA-512',     'SSHA512' => 'SHA-512',
+        'PBKDF2'  => 'PBKDF2',      'Bcrypt'  => 'Bcrypt',
     };
 
     $self->{scheme} = $scheme;
-    $self->{algorithm} = $scheme_meta->{$scheme}->{algorithm};
+    $self->{algorithm} = $scheme_meta->{$scheme};
     $self->{algorithm_meta} = $self->_hash_size;
 
     if (!defined $self->{salt}) {
@@ -528,20 +530,19 @@ sub _generate_salt {
 
 
 
-# How much salt to use for each hash A good
-# salt + password combo should be at least the output 
-# length of the hash. Guarantee that by having salt
-# that is the same length as the hash
+# How much salt to use for each hash A good salt + password combo
+# should be at least the output length of the hash.
+# Guarantee that by having salt that is the same length as the hash
 sub _hash_size {
     my $self = shift;
 
     my $sizes = {
         'MD5'     => { bits => 128, octets => 128 / 8 },
-        'SHA-1'   => { bits => 160, octets => 160 / 8 },
-        'SHA-224' => { bits => 224, octets => 224 / 8 },
-        'SHA-256' => { bits => 256, octets => 256 / 8 },
-        'SHA-384' => { bits => 384, octets => 384 / 8 },
-        'SHA-512' => { bits => 512, octets => 512 / 8 },
+        'SHA-1'   => { bits => 128, octets => 160 / 8 },
+        'SHA-224' => { bits => 128, octets => 224 / 8 },
+        'SHA-256' => { bits => 128, octets => 256 / 8 },
+        'SHA-384' => { bits => 128, octets => 384 / 8 },
+        'SHA-512' => { bits => 128, octets => 512 / 8 },
         'PBKDF2'  => { bits => 128, octets => 128 / 8 },
         'Bcrypt'  => { bits => 128, octets => 128 / 8 },
     };
@@ -550,7 +551,8 @@ sub _hash_size {
 }
 
 
-# From Crypt::Eksblowfish::Bcrypt;
+# From Crypt::Eksblowfish::Bcrypt.
+# Bcrypt uses it's own variation on base64
 sub _en_bcrypt_base64 {
     my ($octets) = @_;
     my $text = encode_base64($octets, '');
@@ -561,7 +563,7 @@ sub _en_bcrypt_base64 {
  
 sub _de_bcrypt_base64 {
     my ($text) = @_;
-    $text =~ tr~./A-Za-z0-9~A-Za-z0-9+/~;
+    $text =~ tr{./A-Za-z0-9}{A-Za-z0-9+/};
     $text .= "=" x (3 - (length($text) + 3) % 4);
     return decode_base64($text);
 }
