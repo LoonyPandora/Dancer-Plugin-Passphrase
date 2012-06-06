@@ -21,7 +21,7 @@ while also supporting any hashing function provided by L<Digest>
     use Dancer ':syntax';
     use Dancer::Plugin::Passphrase;
 
-    post '/login' sub => {
+    post '/login' => sub {
         my $phrase = passphrase( param('my password') )->generate;
 
         # $phrase is now an object that contains RFC 2307 representation
@@ -30,7 +30,7 @@ while also supporting any hashing function provided by L<Digest>
         # You should store $phrase->rfc2307() for use in the matches() method
     };
 
-    get '/protected' sub => {
+    get '/protected' => sub {
         # Retrieve $stored_rfc_2307_string - which MUST be a valid RFC 2307
         # string of the kind returned by the rfc2307() method
 
@@ -39,7 +39,7 @@ while also supporting any hashing function provided by L<Digest>
         }
     };
 
-    get '/generate_new_password' sub => {
+    get '/generate_new_password' => sub {
         return passphrase->generate_random;
     };
 
@@ -106,16 +106,16 @@ method is called on it.
 Accepts a hashref of options to specify what kind of hash should be 
 generated. All options settable in the config file are valid.
 
-If you specify only the scheme, the default settings for that scheme will be used.
+If you specify only the algorithm, the default settings for that algorithm will be used.
 
 A cryptographically random salt is used if salt is not defined.
 Only if you specify the empty string will an empty salt be used
 This is not recommended, and should only be used to upgrade old insecure hashes
 
     my $phrase = passphrase('my password')->generate({
-        scheme => '',   # What method is used to generate the hash
-        cost   => '',   # Cost / Work Factor if using bcrypt 
-        salt   => '',   # Manually specify salt if using a salted digest
+        algorithm  => '',   # What algorithm is used to generate the hash
+        cost       => '',   # Cost / Work Factor if using bcrypt 
+        salt       => '',   # Manually specify salt if using a salted digest
     });
 
 =cut
@@ -292,13 +292,12 @@ generate the hash.
 
 =cut
 
-sub scheme {
+sub algorithm {
     my $self = shift;
 
-    return undef unless $self->{scheme};
-    return $self->{scheme};
+    return undef unless $self->{algorithm};
+    return $self->{algorithm};
 }
-
 
 
 =head2 cost
@@ -435,27 +434,27 @@ sub _calculate_hash {
     my $self = shift;
 
     # All supported hash schemes
-    if ($self->{scheme} ~~ [qw(MD5 SHA-1 SHA-224 SHA-256 SHA-384 SHA-512 BCRYPT)]) {
-        carp "Boo - $self->{scheme}";
+    if ($self->algorithm ~~ [qw(MD5 SHA-1 SHA-224 SHA-256 SHA-384 SHA-512 BCRYPT)]) {
+        carp "Boo - $self->{algorithm}";
     } else {
-        carp "FOO - $self->{scheme}";
+        carp "FOO - $self->{algorithm}";
     }
 
     # Be extra nice, and accept bcrypt case insensitvely
-    $self->{scheme} = 'Bcrypt' if $self->{scheme} =~ m/bcrypt/i;
+    $self->{algorithm} = 'Bcrypt' if $self->{algorithm} =~ m/bcrypt/i;
     
     
     
     
     
-    my $rfc2307_scheme = uc $self->{scheme};
-    $rfc2307_scheme =~ s/\W+//;
+    # $self->{algorithm} = uc $self->{scheme};
+    # $rfc2307_scheme =~ s/\W+//;
 
 
-    my $hash = Digest->new( $self->{scheme} );
+    my $hash = Digest->new( $self->{algorithm} );
 
 
-    given ($self->{scheme}) {
+    given ($self->{algorithm}) {
         when ('Bcrypt') {
             $hash->salt($self->{salt});
             $hash->cost($self->{cost});
@@ -480,39 +479,39 @@ sub _calculate_hash {
     # carp $self->scheme . " - " . $hash->hexdigest;
 
 
-    if (uc $self->{scheme} eq 'BCRYPT') {    
-        my $template     = join('$', '$2a', $self->{cost}, en_base64($self->{salt}));
-        $self->{hash}    = bcrypt($self->{plaintext}, $template);
-        # carp dump $self;
-        $self->{rfc2307} = '{CRYPT}'.$self->{hash};
-    } else {
-        my $rfc2307_scheme = uc $self->{scheme};
-        $rfc2307_scheme =~ s/\W+//;
-
-
-        $rfc2307_scheme = 'SHA'   if $rfc2307_scheme eq 'SHA1';
-        $rfc2307_scheme = 'CRYPT' if $rfc2307_scheme eq 'BCRYPT';
-
-
-        # $rfc2307_scheme;
-
-
-        if ($self->{salt}) {
-            $rfc2307_scheme = 'S'.$rfc2307_scheme;
-        }
-
-        # carp $self->{scheme};
-
-        my $hash = Digest->new( $self->{scheme} );
-
-        $hash->add($self->{plaintext});
-        $hash->add($self->{salt});
-
-        $self->{hash}    = $hash->digest;
-        $self->{rfc2307} = '{'.$rfc2307_scheme.'}'.
-                           encode_base64($self->{hash}.$self->{salt}, '');
-
-    }
+    # if (uc $self->{scheme} eq 'BCRYPT') {    
+    #     my $template     = join('$', '$2a', $self->{cost}, en_base64($self->{salt}));
+    #     $self->{hash}    = bcrypt($self->{plaintext}, $template);
+    #     # carp dump $self;
+    #     $self->{rfc2307} = '{CRYPT}'.$self->{hash};
+    # } else {
+    #     my $rfc2307_scheme = uc $self->{scheme};
+    #     $rfc2307_scheme =~ s/\W+//;
+    # 
+    # 
+    #     $rfc2307_scheme = 'SHA'   if $rfc2307_scheme eq 'SHA1';
+    #     $rfc2307_scheme = 'CRYPT' if $rfc2307_scheme eq 'BCRYPT';
+    # 
+    # 
+    #     # $rfc2307_scheme;
+    # 
+    # 
+    #     if ($self->{salt}) {
+    #         $rfc2307_scheme = 'S'.$rfc2307_scheme;
+    #     }
+    # 
+    #     # carp $self->{scheme};
+    # 
+    #     my $hash = Digest->new( $self->{scheme} );
+    # 
+    #     $hash->add($self->{plaintext});
+    #     $hash->add($self->{salt});
+    # 
+    #     $self->{hash}    = $hash->digest;
+    #     $self->{rfc2307} = '{'.$rfc2307_scheme.'}'.
+    #                        encode_base64($self->{hash}.$self->{salt}, '');
+    # 
+    # }
 
     return $self;
 }
@@ -523,8 +522,8 @@ sub _calculate_hash {
 sub _get_settings {
     my ($self, $options) = @_;
 
-    $self->{scheme} = $options->{scheme} || plugin_setting->{scheme} || 'BCRYPT';
-    my $plugin_setting = plugin_setting->{$self->{scheme}};
+    $self->{algorithm} = $options->{algorithm} || plugin_setting->{algorithm} || 'BCRYPT';
+    my $plugin_setting = plugin_setting->{$self->{algorithm}};
 
     if ($options->{true_random_salt} // $plugin_setting->{true_random_salt}) {
         $self->{true_random_salt} = 1;
@@ -536,7 +535,7 @@ sub _get_settings {
                     _random_salt($self->{true_random_salt});
 
     # Bcrypt requires salt and a cost parameter
-    if (uc $self->{scheme} eq 'BCRYPT') {
+    if (uc $self->{algorithm} eq 'BCRYPT') {
         $self->{cost} = $options->{cost} ||
                         $plugin_setting->{cost} ||
                         4;
