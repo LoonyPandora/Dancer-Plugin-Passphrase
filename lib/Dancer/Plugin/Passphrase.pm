@@ -48,6 +48,8 @@ while also supporting any hashing function provided by L<Digest>
 use strict;
 use feature 'switch';
 
+use lib '/Users/james/Sites/Digest-PBKDF2/lib';
+
 use Dancer::Plugin;
 
 use Crypt::Eksblowfish::Bcrypt qw(bcrypt en_base64 de_base64);
@@ -172,6 +174,12 @@ sub matches {
     if (!$rfc2307_scheme || !$salt_and_digest) {
         die "An RFC 2307 compliant string must be passed to matches()";
     }
+
+    # $self->_get_settings({
+    #     algorithm => '', 
+    #     salt => '',
+    #     cost => '',
+    # });
 
     if ($rfc2307_scheme eq 'CRYPT') {
         my $calculated_hash = bcrypt($self->{plaintext}, $salt_and_digest);
@@ -433,87 +441,133 @@ sub plaintext {
 sub _calculate_hash {
     my $self = shift;
 
-    # All supported hash schemes
-    if ($self->algorithm ~~ [qw(MD5 SHA-1 SHA-224 SHA-256 SHA-384 SHA-512 BCRYPT)]) {
-        carp "Boo - $self->{algorithm}";
-    } else {
-        carp "FOO - $self->{algorithm}";
-    }
-
-    # Be extra nice, and accept bcrypt case insensitvely
-    $self->{algorithm} = 'Bcrypt' if $self->{algorithm} =~ m/bcrypt/i;
-    
-    
-    
-    
-    
-    # $self->{algorithm} = uc $self->{scheme};
-    # $rfc2307_scheme =~ s/\W+//;
-
-
-    my $hash = Digest->new( $self->{algorithm} );
-
+    my $hasher = Digest->new( $self->{algorithm} );
 
     given ($self->{algorithm}) {
         when ('Bcrypt') {
-            $hash->salt($self->{salt});
-            $hash->cost($self->{cost});
+            $hasher->add($self->{plaintext});
+            $hasher->salt($self->raw_salt);
+            $hasher->cost($self->cost);
+
+            $self->{hash} = $hasher->digest;
+            $self->{rfc2307}
+                = '{CRYPT}$2a$'
+                . $self->cost . '$'
+                . _en_bcrypt_base64($self->raw_salt)
+                . _en_bcrypt_base64($self->{hash});
         }
         when ('PBKDF2') {
-            $hash->salt($self->{salt});
-            $hash->cost($self->{cost});
+            $hasher->salt($self->raw_salt);
+
+            $self->{hash} = $hasher->clone->digest;
+            $self->{rfc2307} = '{CRYPT}' . $hasher->as_crypt;
         }
         default {
-            $hash->add($self->{plaintext});
-            $hash->add($self->{salt});
+            $hasher->add($self->{plaintext});
+            $hasher->add($self->{salt});
+
+            $self->{hash} = $hasher->digest;
+            $self->{rfc2307}
+                = '{' . $self->{scheme} . '}'
+                . encode_base64($self->{hash} . $self->{salt}, '');
         }
     }
 
+    return $self;
+}
+
+
+# Extracts the settings from an RFC 2307 string
+sub _extract_settings {
+    my ($self, $rfc2307_string) = @_;
+
+    my ($scheme, $settings) = ($rfc2307_string =~ m/^{(\w+)}(.*)/s);
+
+    unless ($scheme && $settings) {
+        die "I RFC 2307 compliant string must be passed to matches()";
+    }
+    
+    my %options;
+    given ($scheme) {
+        when ('MD5')     { $options{algorithm} = 'MD5';     }
+        when ('SMD5')    { $options{algorithm} = 'MD5';     }
+        when ('SHA')     { $options{algorithm} = 'SHA-1';   }
+        when ('SSHA')    { $options{algorithm} = 'SHA-1';   }
+        when ('SHA224')  { $options{algorithm} = 'SHA-224'; }
+        when ('SSHA224') { $options{algorithm} = 'SHA-224'; }
+        when ('SHA256')  { $options{algorithm} = 'SHA-256'; }
+        when ('SSHA256') { $options{algorithm} = 'SHA-256'; }
+        when ('SHA384')  { $options{algorithm} = 'SHA-384'; }
+        when ('SSHA384') { $options{algorithm} = 'SHA-384'; }
+        when ('SHA512')  { $options{algorithm} = 'SHA-512'; }
+        when ('SSHA512') { $options{algorithm} = 'SHA-512'; }
+        when ('CRYPT')   {
+            
+            if ($settings =~ m{^\$PBKDF2\$}) {
+                $options{algorithm} = 'PBKDF2';
+                return;
+            }
+
+            my (undef, $cost, $salt_and_digest) = split '$', $settings;
+            $options{algorithm} = 'Bcrypt';
+            
+        }
+    }
+    
+    
+    
+    if ($scheme eq 'CRYPT') {
+        my ($algorithm, $cost, ) = split('$', $salt_and_digest);
+    }
     
 
-
-    # $self->{hash}    = $hash->digest;
-    # $self->{rfc2307} = '{'.$rfc2307_scheme.'}'.
-    #                    encode_base64($self->{hash}.$self->{salt}, '');
-
-    # carp $self->scheme . " - " . $hash->hexdigest;
+    # {CRYPT}$PBKDF2$HMACSHA1:1000:u4aTv1JvAC7hmVSBbpgUZw==$h5sARi+Z4ovwTRSLgHOHz31/QLc= at t/004_all_algorithm_matching.t line 13.
+    # {CRYPT}$2a$04$UAnrOCQbaY56OWqgR6BSNeI.txTWw7OyN704EwO6k8AzxVJ4k1sQ2 at t/004_all_algorithm_matching.t line 13.
 
 
-    # if (uc $self->{scheme} eq 'BCRYPT') {    
-    #     my $template     = join('$', '$2a', $self->{cost}, en_base64($self->{salt}));
-    #     $self->{hash}    = bcrypt($self->{plaintext}, $template);
-    #     # carp dump $self;
-    #     $self->{rfc2307} = '{CRYPT}'.$self->{hash};
-    # } else {
-    #     my $rfc2307_scheme = uc $self->{scheme};
-    #     $rfc2307_scheme =~ s/\W+//;
-    # 
-    # 
-    #     $rfc2307_scheme = 'SHA'   if $rfc2307_scheme eq 'SHA1';
-    #     $rfc2307_scheme = 'CRYPT' if $rfc2307_scheme eq 'BCRYPT';
-    # 
-    # 
-    #     # $rfc2307_scheme;
-    # 
-    # 
-    #     if ($self->{salt}) {
-    #         $rfc2307_scheme = 'S'.$rfc2307_scheme;
-    #     }
-    # 
-    #     # carp $self->{scheme};
-    # 
-    #     my $hash = Digest->new( $self->{scheme} );
-    # 
-    #     $hash->add($self->{plaintext});
-    #     $hash->add($self->{salt});
-    # 
-    #     $self->{hash}    = $hash->digest;
-    #     $self->{rfc2307} = '{'.$rfc2307_scheme.'}'.
-    #                        encode_base64($self->{hash}.$self->{salt}, '');
-    # 
-    # }
+    $self->_get_settings({
+        algorithm => '',
+        salt      => '',
+        cost      => '',
+    });
+=cut
+    if ($scheme eq 'CRYPT') {
+        my $calculated_hash = bcrypt($self->{plaintext}, $salt_and_digest);
 
-    return $self;
+        return 1 if $salt_and_digest eq $calculated_hash;        
+        return undef;
+    } else {
+        my ($salt, $digest, $algorithm);
+
+        if (_salt_offset()->{$rfc2307_scheme}) {
+            $salt      = substr(decode_base64($salt_and_digest),    _salt_offset()->{$rfc2307_scheme});
+            $digest    = substr(decode_base64($salt_and_digest), 0, _salt_offset()->{$rfc2307_scheme});
+            $algorithm = $rfc2307_scheme;
+            $algorithm =~ s/^S//;
+        } else {
+            $salt      = '';
+            $digest    = decode_base64($salt_and_digest);
+            $algorithm = $rfc2307_scheme;
+        }
+
+        # Digest:: module names have dashes in them. $scheme names do not.
+        $algorithm =~ s/SHA/SHA-/;
+        $algorithm = 'SHA-1' if $algorithm eq 'SHA-';
+        $algorithm = ucfirst lc $algorithm if $algorithm eq 'WHIRLPOOL';
+
+        $self->{salt}   = $salt;
+        $self->{scheme} = $algorithm;
+
+        $self->_calculate_hash();
+
+        return 1 if $self->raw_hash eq $digest;
+        return undef
+    }
+=cut
+
+
+
+
 }
 
 
@@ -522,7 +576,7 @@ sub _calculate_hash {
 sub _get_settings {
     my ($self, $options) = @_;
 
-    $self->{algorithm} = $options->{algorithm} || plugin_setting->{algorithm} || 'BCRYPT';
+    $self->{algorithm} = $options->{algorithm} || plugin_setting->{algorithm} || 'Bcrypt';
     my $plugin_setting = plugin_setting->{$self->{algorithm}};
 
     if ($options->{true_random_salt} // $plugin_setting->{true_random_salt}) {
@@ -532,18 +586,29 @@ sub _get_settings {
     # Specify empty string to get an unsalted hash
     $self->{salt} = $options->{salt} //
                     $plugin_setting->{salt} //
-                    _random_salt($self->{true_random_salt});
+                    $self->_generate_salt();
 
     # Bcrypt requires salt and a cost parameter
-    if (uc $self->{algorithm} eq 'BCRYPT') {
+    if ($self->{algorithm} eq 'Bcrypt') {
         $self->{cost} = $options->{cost} ||
                         $plugin_setting->{cost} ||
                         4;
 
         $self->{cost} = 31 if $self->{cost} > 31;
         $self->{cost} = sprintf("%02d", $self->{cost});
+    }
 
-        $self->{salt} = _random_salt($self->{true_random_salt});
+    # Set the RFC 2307 Scheme based on the algorithm
+    # but with e a prefixed 'S' if it's salted
+    # Also some algorithms have no standard format, so are CRYPT
+    $self->{scheme} = join '', $self->{algorithm} =~ /[\w]+/g;
+    $self->{scheme} = 'S'.$self->{scheme} if $self->{salt};
+
+    given ($self->{scheme}) {
+        when ('SHA1')    { $self->{scheme} = 'SHA';   }
+        when ('SSHA1')   { $self->{scheme} = 'SSHA';  }
+        when ('SBcrypt') { $self->{scheme} = 'CRYPT'; }
+        when ('SPBKDF2') { $self->{scheme} = 'CRYPT'; }
     }
 
     return $self;
@@ -552,19 +617,21 @@ sub _get_settings {
 
 # Generates 128 bits of entropy to use as a salt. bcrypt requires
 # exactly this amount, and it's a reasonable amount for other algorithms
-sub _random_salt {
-    my ($true_random_salt) = @_;
-    my $entropy_source;
+sub _generate_salt {
+    my $self = shift;
+
+    my $salt_size = $self->_hash_size();
 
     # This is truly random, but potentially blocks - hence it's not the default
-    if ($true_random_salt) {
+    my $entropy_source;
+    if ($self->{true_random_salt}) {
         $entropy_source = Data::Entropy::Source->new(
             Data::Entropy::RawSource::Local->new, 'sysread'
         );
     }
 
     return with_entropy_source $entropy_source, sub {
-        entropy_source->get_bits('128');
+        entropy_source->get_bits($salt_size);
     };
 }
 
@@ -572,17 +639,98 @@ sub _random_salt {
 # Length of a hash in octets. Used to separate salt from a hash
 sub _salt_offset {
     return {
-        'SMD4'       => 128 / 8,
         'SMD5'       => 128 / 8,
         'SSHA'       => 160 / 8,
         'SSHA224'    => 224 / 8,
         'SSHA256'    => 256 / 8,
         'SSHA384'    => 384 / 8,
         'SSHA512'    => 512 / 8,
-        'SWHIRLPOOL' => 512 / 8,
     };
 }
 
+
+
+
+
+
+
+# How much salt to use for each hash A good
+# salt + password combo should be at least the output 
+# length of the hash. Guarantee that by having salt
+# that is the same length as the hash
+sub _hash_size {
+    my $self = shift;
+
+    my $sizes = {
+        'MD5'     => 128,
+        'SHA-1'   => 160,
+        'SHA-224' => 224,
+        'SHA-256' => 256,
+        'SHA-384' => 384,
+        'SHA-512' => 512,
+        'PBKDF2'  => 128,
+        'Bcrypt'  => 128,
+    };
+
+    return $sizes->{$self->algorithm};
+}
+
+
+
+sub _scheme_info {
+    my $self = shift;
+
+    my $algorithm = {
+        'MD5'     => { bits => 128, octets => 128 / 8 },
+        'SHA-1'   => { bits => 160, octets => 160 / 8 },
+        'SHA-224' => { bits => 224, octets => 224 / 8 },
+        'SHA-256' => { bits => 256, octets => 256 / 8 },
+        'SHA-384' => { bits => 384, octets => 384 / 8 },
+        'SHA-512' => { bits => 512, octets => 512 / 8 },
+        'PBKDF2'  => { bits => 128, octets => 128 / 8 },
+        'Bcrypt'  => { bits => 128, octets => 128 / 8 },
+    };
+
+
+    $self->{algorithm_meta} = $algorithm->{$self->{algorithm}};
+
+    my $scheme = {
+        'MD5'     => $algorithm->{'MD5'},
+        'SMD5'    => $algorithm->{'MD5'},
+        'SHA'     => $algorithm->{'SHA-1'},
+        'SSHA'    => $algorithm->{'SHA-1'},
+        'SHA224'  => $algorithm->{'SHA-224'},
+        'SSHA224' => $algorithm->{'SHA-224'},
+        'SHA256'  => $algorithm->{'SHA-256'},
+        'SSHA256' => $algorithm->{'SHA-256'},
+        'SHA384'  => $algorithm->{'SHA-384'},
+        'SSHA384' => $algorithm->{'SHA-384'},
+        'SHA512'  => $algorithm->{'SHA-512'},
+        'SSHA512' => $algorithm->{'SHA-512'},
+        'PBKDF2'  => $algorithm->{'PBKDF2'},
+        'Bcrypt'  => $algorithm->{'Bcrypt'},
+    };
+
+}
+
+
+
+# From Crypt::Eksblowfish::Bcrypt;
+sub _en_bcrypt_base64 {
+    my ($octets) = @_;
+    my $text = encode_base64($octets, '');
+    $text =~ tr{A-Za-z0-9+/=}{./A-Za-z0-9}d;
+    return $text;
+}
+ 
+ 
+sub _de_bcrypt_base64 {
+    my ($text) = @_;
+    $text =~ tr~./A-Za-z0-9~A-Za-z0-9+/~;
+    $text .= "=" x (3 - (length($text) + 3) % 4);
+    return decode_base64($text);
+}
+ 
 
 
 register_plugin;
@@ -669,15 +817,15 @@ using default settings.
 You will need to make sure your database columns are at least this long.
 If the string gets truncated, the password can I<never> be validated.
 
-    SCHEME      LENGTH  EXAMPLE RFC 2307 STRING
+    ALGORITHM   SCHEME      LENGTH  EXAMPLE RFC 2307 STRING
 
-    CRYPT       68      {CRYPT}$2a$04$MjkMhQxasFQod1qq56DXCOvWu6YTWk9X.EZGnmSSIbbtyEBIAixbS
-    SSHA512     118     {SSHA512}lZG4dZ5EU6dPEbJ1kBPPzEcupFloFSIJjiXCwMVxJXOy/x5qhBA5XH8FiUWj7u59onQxa97xYdqje/fwY5TDUcW1Urplf3KHMo9NO8KO47o=
-    SSHA384     98      {SSHA384}SqZF5YYyk4NdjIM8YgQVfRieXDxNG0dKH4XBcM40Eblm+ribCzdyf0JV7i2xJvVHZsFSQNcuZPKtiTMzDyOU+w==
-    SSHA256     74      {SSHA256}xsJHNzPlNCpOZ41OkTfQOU35ZY+nRyZFaM8lHg5U2pc0xT3DKNlGW2UTY0NPYsxU
-    SSHA224     70      {SSHA224}FTHNkvKOdyX1d6f45iKLVxpaXZiHel8pfilUT1dIZ5u+WIUyhDGxLnx72X0=
-    SSHA        55      {SSHA}Qsaao/Xi/bYTRMQnpHuD3y5nj02wbdcw5Cek2y2nLs3pIlPh
-    SMD5        51      {SMD5}bgfLiUQWgzUm36+nBhFx62bi0xdwTp+UpEeNKDxSLfM=
+    Bcrypt      CRYPT       68      {CRYPT}$2a$04$MjkMhQxasFQod1qq56DXCOvWu6YTWk9X.EZGnmSSIbbtyEBIAixbS
+    SHA-512     SSHA512     118     {SSHA512}lZG4dZ5EU6dPEbJ1kBPPzEcupFloFSIJjiXCwMVxJXOy/x5qhBA5XH8FiUWj7u59onQxa97xYdqje/fwY5TDUcW1Urplf3KHMo9NO8KO47o=
+    SHA-384     SSHA384     98      {SSHA384}SqZF5YYyk4NdjIM8YgQVfRieXDxNG0dKH4XBcM40Eblm+ribCzdyf0JV7i2xJvVHZsFSQNcuZPKtiTMzDyOU+w==
+    SHA-256     SSHA256     74      {SSHA256}xsJHNzPlNCpOZ41OkTfQOU35ZY+nRyZFaM8lHg5U2pc0xT3DKNlGW2UTY0NPYsxU
+    SHA-224     SSHA224     70      {SSHA224}FTHNkvKOdyX1d6f45iKLVxpaXZiHel8pfilUT1dIZ5u+WIUyhDGxLnx72X0=
+    SHA-1       SSHA        55      {SSHA}Qsaao/Xi/bYTRMQnpHuD3y5nj02wbdcw5Cek2y2nLs3pIlPh
+    MD5         SMD5        51      {SMD5}bgfLiUQWgzUm36+nBhFx62bi0xdwTp+UpEeNKDxSLfM=
 
 =head2 Common Mistakes
 
