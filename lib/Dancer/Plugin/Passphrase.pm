@@ -27,12 +27,12 @@ while also supporting any hashing function provided by L<Digest>
         # $phrase is now an object that contains RFC 2307 representation
         # of the hashed passphrase, along with the salt and the raw_hash
         
-        # You should store $phrase->rfc2307() for use in the matches() method
+        # You should store $phrase->rfc2307() for use later
     };
 
     get '/protected' => sub {
-        # Retrieve $stored_rfc_2307_string - which MUST be a valid RFC 2307
-        # string of the kind returned by the rfc2307() method
+        # Retrieve $stored_rfc_2307_string, like we created above.
+        # IT MUST be a valid RFC 2307 string
 
         if ( passphrase( param('my password') )->matches( $stored_rfc_2307 ) ) {
             # Passphrase matches!
@@ -131,10 +131,6 @@ sub generate {
     return $self;
 }
 
-# For backwards compatibility
-*generate_hash = \&generate;
-
-
 
 =head2 passphrase->matches
 
@@ -226,8 +222,6 @@ sub rfc2307 {
     return shift->{rfc2307} || undef;
 }
 
-# For backwards compatibility
-*as_rfc2307 = \&rfc2307;
 
 
 =head2 scheme
