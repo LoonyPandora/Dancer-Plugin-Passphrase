@@ -175,11 +175,7 @@ sub matches {
 
     my $new_hash = $self->_extract_settings($stored_hash)->_calculate_hash->rfc2307;
 
-    if ($new_hash eq $stored_hash) {
-        return 1;    
-    }
-
-    return undef;
+    return ($new_hash eq $stored_hash) ? 1 : undef;
 }
 
 
@@ -227,10 +223,7 @@ Returns the rfc2307 representation from a C<Dancer::Plugin::Passphrase> object.
 =cut
 
 sub rfc2307 {
-    my $self = shift;
-
-    return undef unless $self->{rfc2307};
-    return $self->{rfc2307};
+    return shift->{rfc2307} || undef;
 }
 
 # For backwards compatibility
@@ -248,10 +241,7 @@ This is the scheme name as used in the RFC 2307 representation
 =cut
 
 sub scheme {
-    my $self = shift;
-
-    return undef unless $self->{scheme};
-    return $self->{scheme};
+    return shift->{scheme} || undef;
 }
 
 
@@ -267,10 +257,7 @@ generate the hash.
 =cut
 
 sub algorithm {
-    my $self = shift;
-
-    return undef unless $self->{algorithm};
-    return $self->{algorithm};
+    return shift->{algorithm} || undef;
 }
 
 
@@ -284,10 +271,7 @@ Only works when using the bcrypt algorithm, returns undef for other algorithms
 =cut
 
 sub cost {
-    my $self = shift;
-
-    return undef unless $self->{cost};
-    return $self->{cost};
+    return shift->{cost} || undef;
 }
 
 
@@ -297,13 +281,14 @@ Returns the raw salt from a C<Dancer::Plugin::Passphrase> object.
 
     passphrase('my password')->generate->raw_salt;
 
+Can be defined, but false - The empty string is technically a valid salt.
+
+Returns C<undef> if there is no salt.
+
 =cut
 
 sub raw_salt {
-    my $self = shift;
-
-    return undef unless $self->{salt};
-    return $self->{salt};
+    return shift->{salt} // undef;
 }
 
 
@@ -316,10 +301,7 @@ Returns the raw hash from a C<Dancer::Plugin::Passphrase> object.
 =cut
 
 sub raw_hash {
-    my $self = shift;
-
-    return undef unless $self->{hash};
-    return $self->{hash};
+    return shift->{hash} || undef;
 }
 
 
@@ -329,13 +311,14 @@ Returns the hex-encoded salt from a C<Dancer::Plugin::Passphrase> object.
 
     passphrase('my password')->generate->salt_hex;
 
+Can be defined, but false - The empty string is technically a valid salt.
+
+Returns C<undef> if there is no salt.
+
 =cut
 
-sub salt_hex {
-    my $self = shift;
-
-    return undef unless $self->{salt};
-    return unpack("H*", $self->{salt});
+sub salt_hex {    
+    return unpack("H*", shift->{salt}) // undef;
 }
 
 
@@ -348,10 +331,7 @@ Returns the hex-encoded hash from a C<Dancer::Plugin::Passphrase> object.
 =cut
 
 sub hash_hex {
-    my $self = shift;
-
-    return undef unless $self->{hash};
-    return unpack("H*", $self->{hash});
+    return unpack("H*", shift->{hash}) || undef;
 }
 
 
@@ -361,13 +341,14 @@ Returns the base64 encoded salt from a C<Dancer::Plugin::Passphrase> object.
 
     passphrase('my password')->generate->salt_base64;
 
+Can be defined, but false - The empty string is technically a valid salt.
+
+Returns C<undef> if there is no salt.
+
 =cut
 
 sub salt_base64 {
-    my $self = shift;
-
-    return undef unless $self->{salt};
-    return encode_base64($self->{salt}, '');
+    return encode_base64(shift->{salt}, '') // undef;
 }
 
 
@@ -380,10 +361,7 @@ Returns the base64 encoded hash from a C<Dancer::Plugin::Passphrase> object.
 =cut
 
 sub hash_base64 {
-    my $self = shift;
-
-    return undef unless $self->{hash};
-    return encode_base64($self->{hash}, '');
+    return encode_base64(shift->{hash}, '') || undef;
 }
 
 =head2 plaintext
@@ -395,10 +373,7 @@ Returns the plaintext password as originally supplied to the L<passphrase> keywo
 =cut
 
 sub plaintext {
-    my $self = shift;
-
-    return undef unless $self->{plaintext};
-    return $self->{plaintext};
+    return shift->{plaintext} || undef;
 }
 
 
@@ -663,9 +638,9 @@ a strong psuedo-random salt.
 
     plugins:
         Passphrase:
-            default: bcrypt
+            default: Bcrypt
 
-            bcrypt:
+            Bcrypt:
                 cost: 8
 
 
