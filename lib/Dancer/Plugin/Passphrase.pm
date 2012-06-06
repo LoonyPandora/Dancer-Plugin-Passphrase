@@ -395,7 +395,8 @@ sub _calculate_hash {
 
             $self->{hash} = $hasher->digest;
             $self->{rfc2307}
-                = '{CRYPT}$2a$'
+                = '{CRYPT}$'
+                . $self->{type} . '$'
                 . $self->cost . '$'
                 . _en_bcrypt_base64($self->raw_salt)
                 . _en_bcrypt_base64($self->{hash});
@@ -437,11 +438,11 @@ sub _extract_settings {
 
     if ($scheme eq 'CRYPT'){
         given ($settings) {
-            when (/^\$2a\$/)     {
+            when (/^\$2(?:a|x|y)\$/)     {
                 $scheme = 'Bcrypt';
-                $settings =~ m{\A\$2(?:a|x|y)\$([0-9]{2})\$([./A-Za-z0-9]{22})}x;
+                $settings =~ m{\A\$(2a|2x|2y)\$([0-9]{2})\$([./A-Za-z0-9]{22})}x;
 
-                ($self->{cost}, $self->{salt}) = ($1, _de_bcrypt_base64($2));
+                ($self->{type}, $self->{cost}, $self->{salt}) = ($1, $2, _de_bcrypt_base64($3));
             }
             when (/^\$PBKDF2\$/) {
                 $scheme = 'PBKDF2';
@@ -509,7 +510,7 @@ sub _get_settings {
     # Bcrypt requires a cost parameter
     if ($self->{algorithm} eq 'Bcrypt') {
         $self->{scheme} = 'CRYPT';
-
+        $self->{type} = '2a';
         $self->{cost} = $options->{cost} ||
                         $plugin_setting->{cost} ||
                         4;
