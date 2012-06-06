@@ -155,7 +155,7 @@ the password hash and the salt concatenated together - in that order.
     '{'.$scheme.'}'.encode_base64($hash . $salt, '');
 
 Where C<$scheme> can be any of the following and their unsalted variants,
-which have the leading S removed. CRYPT is always salted.
+which have the leading S removed. CRYPT will be either Bcrypt of PBKDF2.
 
     SMD5 SSHA SSHA224 SSHA256 SSHA384 SSHA512 CRYPT
 
@@ -674,7 +674,7 @@ a strong psuedo-random salt.
 You should be storing the RFC 2307 string in your database, it's the easiest way
 to use this module. You could store the C<raw_salt>, C<raw_hash>, and C<scheme>
 separately, but this strongly discouraged. RFC 2307 strings are specifically
-designed for storing hashed passwords, and should always be used.
+designed for storing hashed passwords, and should be used wherever possible.
 
 The length of the string produced by L<generate()|/"passphrase__generate"> can
 vary dependent on your settings. Below is a table of the lengths generated
@@ -683,15 +683,16 @@ using default settings.
 You will need to make sure your database columns are at least this long.
 If the string gets truncated, the password can I<never> be validated.
 
-    ALGORITHM   SCHEME      LENGTH  EXAMPLE RFC 2307 STRING
-
-    Bcrypt      CRYPT       68      {CRYPT}$2a$04$MjkMhQxasFQod1qq56DXCOvWu6YTWk9X.EZGnmSSIbbtyEBIAixbS
-    SHA-512     SSHA512     118     {SSHA512}lZG4dZ5EU6dPEbJ1kBPPzEcupFloFSIJjiXCwMVxJXOy/x5qhBA5XH8FiUWj7u59onQxa97xYdqje/fwY5TDUcW1Urplf3KHMo9NO8KO47o=
-    SHA-384     SSHA384     98      {SSHA384}SqZF5YYyk4NdjIM8YgQVfRieXDxNG0dKH4XBcM40Eblm+ribCzdyf0JV7i2xJvVHZsFSQNcuZPKtiTMzDyOU+w==
-    SHA-256     SSHA256     74      {SSHA256}xsJHNzPlNCpOZ41OkTfQOU35ZY+nRyZFaM8lHg5U2pc0xT3DKNlGW2UTY0NPYsxU
-    SHA-224     SSHA224     70      {SSHA224}FTHNkvKOdyX1d6f45iKLVxpaXZiHel8pfilUT1dIZ5u+WIUyhDGxLnx72X0=
-    SHA-1       SSHA        55      {SSHA}Qsaao/Xi/bYTRMQnpHuD3y5nj02wbdcw5Cek2y2nLs3pIlPh
-    MD5         SMD5        51      {SMD5}bgfLiUQWgzUm36+nBhFx62bi0xdwTp+UpEeNKDxSLfM=
+    ALGORITHM   LENGTH  EXAMPLE RFC 2307 STRING
+    
+    Bcrypt      68      {CRYPT}$2a$04$MjkMhQxasFQod1qq56DXCOvWu6YTWk9X.EZGnmSSIbbtyEBIAixbS
+    PBKDF2      83      {CRYPT}$PBKDF2$HMACSHA1:1000:rk+lLVEK4hIaO7LD1XAqFQ==$JLD02XHAB1dNZCl9coIcvu8OIMc=
+    SHA-512     118     {SSHA512}lZG4dZ5EU6dPEbJ1kBPPzEcupFloFSIJjiXCwMVxJXOy/x5qhBA5XH8FiUWj7u59onQxa97xYdqje/fwY5TDUcW1Urplf3KHMo9NO8KO47o=
+    SHA-384     98      {SSHA384}SqZF5YYyk4NdjIM8YgQVfRieXDxNG0dKH4XBcM40Eblm+ribCzdyf0JV7i2xJvVHZsFSQNcuZPKtiTMzDyOU+w==
+    SHA-256     74      {SSHA256}xsJHNzPlNCpOZ41OkTfQOU35ZY+nRyZFaM8lHg5U2pc0xT3DKNlGW2UTY0NPYsxU
+    SHA-224     70      {SSHA224}FTHNkvKOdyX1d6f45iKLVxpaXZiHel8pfilUT1dIZ5u+WIUyhDGxLnx72X0=
+    SHA-1       55      {SSHA}Qsaao/Xi/bYTRMQnpHuD3y5nj02wbdcw5Cek2y2nLs3pIlPh
+    MD5         51      {SMD5}bgfLiUQWgzUm36+nBhFx62bi0xdwTp+UpEeNKDxSLfM=
 
 =head2 Common Mistakes
 
@@ -800,4 +801,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-
