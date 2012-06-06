@@ -1,4 +1,4 @@
-use Test::More tests => 16;
+use Test::More tests => 28;
 
 use strict;
 use warnings;
@@ -11,6 +11,14 @@ my $secret = "Super Secret Squirrel";
 for (qw(MD5 SHA-1 SHA-224 SHA-256 SHA-384 SHA-512 Bcrypt PBKDF2)) {
     my $rfc2307 = passphrase($secret)->generate({ algorithm => $_ })->rfc2307;
 
-    ok(passphrase($secret)->matches($rfc2307),  "Match plaintext to hash => $_");
-    ok(!passphrase('WRONG')->matches($rfc2307), "Incorrect passwords should be rejected => $_");
+    ok(passphrase($secret)->matches($rfc2307),  "With Salt - Match plaintext to hash => $_");
+    ok(!passphrase('WRONG')->matches($rfc2307), "With Salt - Incorrect passwords should be rejected => $_");
+}
+
+
+for (qw(MD5 SHA-1 SHA-224 SHA-256 SHA-384 SHA-512)) {
+    my $rfc2307 = passphrase($secret)->generate({ algorithm => $_, salt => '' })->rfc2307;
+
+    ok(passphrase($secret)->matches($rfc2307),  "No Salt - Match plaintext to hash => $_");
+    ok(!passphrase('WRONG')->matches($rfc2307), "No Salt - Incorrect passwords should be rejected => $_");
 }
