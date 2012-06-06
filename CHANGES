@@ -1,21 +1,29 @@
-1.1.0   2012-04-01
+1.1.0   2012-06-06
 
     [ FEATURE ]
-    * Added support for scrypt algorithm, via Crypt::Scrypt and Digest::Scrypt
-    * Improved support for bcrypt using the new Digest::Bcrypt;
+    * Improved support for bcrypt using the new Digest::Bcrypt module
+    * Added support for PBKDF2 via Digest::PBKDF2
+    * Removed redundant true_random_salt setting
 
     [ MISC ]
-    * Massive code refactor to make use of the new Digest::
-      version of scrypt and bcrypt
+    * Large code refactor to ease future maintenance
+
+    [ BUGFIX ]
+    * Fix issue where the hash_hex, hash_b64, and raw_hash methods
+      return incorrect values when working on bcrypt hashes.
+
+    [ DOCUMENTATION ]
+    * Use Pod::Coverage to make sure all methods are documented fully
+
 
 1.0.1   2012-03-30
 
     [ DOCUMENTATION ]
-    * Clarified documentation detailing what part of the object to store
+    * GH #1: Clarified documentation detailing what part of the object to store
     * Added section with default lengths of RFC 2307 strings
 
     [ BUGFIX ]
-    * Improved error handling when trying to use the matches() method
+    * GH #2: Improved error handling when trying to use the matches() method
       without providing a valid RFC 2307 string
       
 
