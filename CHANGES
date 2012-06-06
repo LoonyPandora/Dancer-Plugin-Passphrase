@@ -1,12 +1,16 @@
-1.1.0   2012-06-06
+2.0.0   2012-06-06
 
     [ FEATURE ]
     * Improved support for bcrypt using the new Digest::Bcrypt module
     * Added support for PBKDF2 via Digest::PBKDF2
-    * Removed redundant true_random_salt setting
+    * Added support for $2x$ and $2y$ variations of bcrypt
+    * Added algorithm method, for finding out exactly
+      which module generated your hash
 
     [ MISC ]
     * Large code refactor to ease future maintenance
+    * Removed deprecated true_random_salt setting
+    * Removed deprecated as_rfc2307 and generate_hash methods
 
     [ BUGFIX ]
     * Fix issue where the hash_hex, hash_b64, and raw_hash methods
