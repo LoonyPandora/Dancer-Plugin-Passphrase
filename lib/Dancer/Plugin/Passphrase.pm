@@ -53,7 +53,7 @@ use lib '/Users/james/Sites/Digest-PBKDF2/lib';
 use Dancer::Plugin;
 
 # use Crypt::Eksblowfish::Bcrypt qw(bcrypt en_base64 de_base64);
-use Carp qw(croak);
+use Carp qw(carp croak);
 use Data::Dump qw(dump);
 use Data::Entropy qw(entropy_source);
 use Data::Entropy::Algorithms qw(rand_bits rand_int);
@@ -440,7 +440,7 @@ sub _extract_settings {
         given ($settings) {
             when (/^\$2a\$/)     {
                 $scheme = 'Bcrypt';
-                $settings =~ m{\A\$2a\$([0-9]{2})\$([./A-Za-z0-9]{22})}x;
+                $settings =~ m{\A\$2(?:a|x|y)\$([0-9]{2})\$([./A-Za-z0-9]{22})}x;
 
                 ($self->{cost}, $self->{salt}) = ($1, _de_bcrypt_base64($2));
             }
@@ -455,21 +455,27 @@ sub _extract_settings {
     }
 
     my $scheme_meta = {
-        'MD5'     => 'MD5',         'SMD5'    => 'MD5',
-        'SHA'     => 'SHA-1',       'SSHA'    => 'SHA-1',
-        'SHA224'  => 'SHA-224',     'SSHA224' => 'SHA-224',
-        'SHA256'  => 'SHA-256',     'SSHA256' => 'SHA-256',
-        'SHA384'  => 'SHA-384',     'SSHA384' => 'SHA-384',
-        'SHA512'  => 'SHA-512',     'SSHA512' => 'SHA-512',
-        'PBKDF2'  => 'PBKDF2',      'Bcrypt'  => 'Bcrypt',
+        'MD5'     => { algorithm => 'MD5',     octets => 128 / 8 },
+        'SMD5'    => { algorithm => 'MD5',     octets => 128 / 8 },
+        'SHA'     => { algorithm => 'SHA-1',   octets => 160 / 8 },
+        'SSHA'    => { algorithm => 'SHA-1',   octets => 160 / 8 },
+        'SHA224'  => { algorithm => 'SHA-224', octets => 224 / 8 },
+        'SSHA224' => { algorithm => 'SHA-224', octets => 224 / 8 },
+        'SHA256'  => { algorithm => 'SHA-256', octets => 256 / 8 },
+        'SSHA256' => { algorithm => 'SHA-256', octets => 256 / 8 },
+        'SHA384'  => { algorithm => 'SHA-384', octets => 384 / 8 },
+        'SSHA384' => { algorithm => 'SHA-384', octets => 384 / 8 },
+        'SHA512'  => { algorithm => 'SHA-512', octets => 512 / 8 },
+        'SSHA512' => { algorithm => 'SHA-512', octets => 512 / 8 },
+        'PBKDF2'  => { algorithm => 'PBKDF2',  octets => 128 / 8 },
+        'Bcrypt'  => { algorithm => 'Bcrypt',  octets => 128 / 8 },
     };
 
-    $self->{scheme} = $scheme;
-    $self->{algorithm} = $scheme_meta->{$scheme};
-    $self->{algorithm_meta} = $self->_hash_size;
+    $self->{scheme}    = $scheme;
+    $self->{algorithm} = $scheme_meta->{$scheme}->{algorithm};
 
     if (!defined $self->{salt}) {
-        $self->{salt} = substr(decode_base64($settings), $self->{algorithm_meta}->{octets});    
+        $self->{salt} = substr(decode_base64($settings), $scheme_meta->{$scheme}->{octets});    
     }
 
     return $self;
@@ -525,29 +531,7 @@ sub _get_settings {
 sub _generate_salt {
     my $self = shift;
 
-    entropy_source->get_bits($self->_hash_size->{bits});
-}
-
-
-
-# How much salt to use for each hash A good salt + password combo
-# should be at least the output length of the hash.
-# Guarantee that by having salt that is the same length as the hash
-sub _hash_size {
-    my $self = shift;
-
-    my $sizes = {
-        'MD5'     => { bits => 128, octets => 128 / 8 },
-        'SHA-1'   => { bits => 128, octets => 160 / 8 },
-        'SHA-224' => { bits => 128, octets => 224 / 8 },
-        'SHA-256' => { bits => 128, octets => 256 / 8 },
-        'SHA-384' => { bits => 128, octets => 384 / 8 },
-        'SHA-512' => { bits => 128, octets => 512 / 8 },
-        'PBKDF2'  => { bits => 128, octets => 128 / 8 },
-        'Bcrypt'  => { bits => 128, octets => 128 / 8 },
-    };
-
-    return $sizes->{$self->algorithm};
+    entropy_source->get_bits(128);
 }
 
 
