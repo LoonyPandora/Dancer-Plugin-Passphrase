@@ -52,8 +52,7 @@ use lib '/Users/james/Sites/Digest-PBKDF2/lib';
 
 use Dancer::Plugin;
 
-# use Crypt::Eksblowfish::Bcrypt qw(bcrypt en_base64 de_base64);
-use Carp qw(carp croak);
+use Carp qw(croak);
 use Data::Dump qw(dump);
 use Data::Entropy qw(entropy_source);
 use Data::Entropy::Algorithms qw(rand_bits rand_int);
@@ -487,20 +486,30 @@ sub _extract_settings {
 sub _get_settings {
     my ($self, $options) = @_;
 
-    $self->{algorithm} = $options->{algorithm} || plugin_setting->{algorithm} || 'Bcrypt';
-    my $plugin_setting = plugin_setting->{$self->{algorithm}};
+    $self->{algorithm} = $options->{algorithm} || 
+                         plugin_setting->{algorithm} || 
+                         'Bcrypt';
 
-    if ($options->{true_random_salt} // $plugin_setting->{true_random_salt}) {
-        $self->{true_random_salt} = 1;
-    }
+    my $plugin_setting = plugin_setting->{$self->{algorithm}};
 
     # Specify empty string to get an unsalted hash
     $self->{salt} = $options->{salt} //
                     $plugin_setting->{salt} //
                     $self->_generate_salt();
 
-    # Bcrypt requires salt and a cost parameter
+    # RFC 2307 scheme is based on the algorithm, with a prefixed 'S' for salted
+    $self->{scheme} = join '', $self->{algorithm} =~ /[\w]+/g;
+    $self->{scheme} = 'S'.$self->{scheme} if $self->{salt};
+
+    given ($self->{scheme}) {
+        when ('SHA1')    { $self->{scheme} = 'SHA';   }
+        when ('SSHA1')   { $self->{scheme} = 'SSHA';  }
+    }
+
+    # Bcrypt requires a cost parameter
     if ($self->{algorithm} eq 'Bcrypt') {
+        $self->{scheme} = 'CRYPT';
+
         $self->{cost} = $options->{cost} ||
                         $plugin_setting->{cost} ||
                         4;
@@ -509,17 +518,10 @@ sub _get_settings {
         $self->{cost} = sprintf("%02d", $self->{cost});
     }
 
-    # Set the RFC 2307 Scheme based on the algorithm
-    # but with e a prefixed 'S' if it's salted
-    # Also some algorithms have no standard format, so are CRYPT
-    $self->{scheme} = join '', $self->{algorithm} =~ /[\w]+/g;
-    $self->{scheme} = 'S'.$self->{scheme} if $self->{salt};
-
-    given ($self->{scheme}) {
-        when ('SHA1')    { $self->{scheme} = 'SHA';   }
-        when ('SSHA1')   { $self->{scheme} = 'SSHA';  }
-        when ('SBcrypt') { $self->{scheme} = 'CRYPT'; }
-        when ('SPBKDF2') { $self->{scheme} = 'CRYPT'; }
+    # PBKDF2 requires an iteration parameter
+    # Eventually, when Digest::PBKDF2 is updated
+    if ($self->{algorithm} eq 'PBKDF2') {
+        $self->{scheme} = 'CRYPT';
     }
 
     return $self;
@@ -545,6 +547,7 @@ sub _en_bcrypt_base64 {
 }
  
  
+# And the decoder of bcrypt's custom base64
 sub _de_bcrypt_base64 {
     my ($text) = @_;
     $text =~ tr{./A-Za-z0-9}{A-Za-z0-9+/};
