@@ -15,6 +15,9 @@
     [ DOCUMENTATION ]
     * Use Pod::Coverage to make sure all methods are documented fully
 
+    [ TESTS ]
+    * Added Tests for defined but false salts
+
 
 1.0.1   2012-03-30
 
