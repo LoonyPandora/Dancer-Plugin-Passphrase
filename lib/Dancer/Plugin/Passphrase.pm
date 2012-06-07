@@ -280,6 +280,20 @@ sub cost {
 }
 
 
+=head2 iterations
+
+Returns the PBKDF2 iteration count from a C<Dancer::Plugin::Passphrase> object.
+Only works when using the PBKDF2 algorithm, returns undef for other algorithms
+
+    passphrase('my password')->generate->iterations;
+
+=cut
+
+sub iterations {
+    return shift->{iterations} || undef;
+}
+
+
 =head2 raw_salt
 
 Returns the raw salt from a C<Dancer::Plugin::Passphrase> object.
@@ -404,10 +418,12 @@ sub _calculate_hash {
         when ('PBKDF2') {
             $hasher->add($self->{plaintext});
             $hasher->salt($self->raw_salt);
+            $hasher->iterations($self->iterations);
 
             $self->{hash} = $hasher->digest;
             $self->{rfc2307}
-                = '{CRYPT}$PBKDF2$HMACSHA1:1000:'
+                = '{CRYPT}$PBKDF2$HMACSHA1:'
+                . $self->iterations . ':'
                 . encode_base64($self->raw_salt, '') . '$'
                 . encode_base64($self->{hash},   '');
         }
@@ -523,6 +539,9 @@ sub _get_settings {
     # Eventually, when Digest::PBKDF2 is updated
     if ($self->{algorithm} eq 'PBKDF2') {
         $self->{scheme} = 'CRYPT';
+        $self->{iterations} = $options->{iterations} ||
+                        $plugin_setting->{iterations} ||
+                        1000;
     }
 
     return $self;
