@@ -128,6 +128,9 @@ sub generate {
     return $self;
 }
 
+# Alias for backwards compatibility
+*generate_hash = \&generate;
+
 
 
 =head2 matches
@@ -226,6 +229,9 @@ Returns the rfc2307 representation from a C<Dancer::Plugin::Passphrase> object.
 sub rfc2307 {
     return shift->{rfc2307} || undef;
 }
+
+# Alias for backwards compatibility
+*as_rfc2307 = \&rfc2307;
 
 
 
