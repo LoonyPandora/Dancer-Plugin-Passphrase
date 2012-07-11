@@ -6,11 +6,12 @@
     * Added support for $2x$ and $2y$ variations of bcrypt
     * Added algorithm method, for finding out exactly
       which module generated your hash
-
+    * Now croaks when non RFC2307 string string is passed to the matches method
+    
     [ MISC ]
     * Large code refactor to ease future maintenance
     * Removed deprecated true_random_salt setting
-    * Removed deprecated as_rfc2307 and generate_hash methods
+    * Deprecated as_rfc2307 and generate_hash methods
 
     [ BUGFIX ]
     * Fix issue where the hash_hex, hash_b64, and raw_hash methods
@@ -18,7 +19,8 @@
 
     [ DOCUMENTATION ]
     * Use Pod::Coverage to make sure all methods are documented fully
-
+    * Added better documentation for best-practice when matching legacy hashes
+    
     [ TESTS ]
     * Added Tests for defined but false salts
 
