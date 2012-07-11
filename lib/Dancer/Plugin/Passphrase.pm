@@ -48,7 +48,7 @@ while also supporting any hashing function provided by L<Digest>
 use strict;
 use feature 'switch';
 
-use lib '/Users/james/Sites/Digest-PBKDF2/lib';
+# use lib '/Users/james/Sites/Digest-PBKDF2/lib';
 
 use Dancer::Plugin;
 
@@ -405,9 +405,9 @@ sub plaintext {
 sub _calculate_hash {
     my $self = shift;
 
-    my $hasher = Digest->new( $self->{algorithm} );
+    my $hasher = Digest->new( $self->algorithm );
 
-    given ($self->{algorithm}) {
+    given ($self->algorithm) {
         when ('Bcrypt') {
             $hasher->add($self->{plaintext});
             $hasher->salt($self->raw_salt);
@@ -513,7 +513,7 @@ sub _get_settings {
                          plugin_setting->{algorithm} || 
                          'Bcrypt';
 
-    my $plugin_setting = plugin_setting->{$self->{algorithm}};
+    my $plugin_setting = plugin_setting->{$self->algorithm};
 
     # Specify empty string to get an unsalted hash
     $self->{salt} = $options->{salt} //
@@ -521,7 +521,7 @@ sub _get_settings {
                     $self->_generate_salt();
 
     # RFC 2307 scheme is based on the algorithm, with a prefixed 'S' for salted
-    $self->{scheme} = join '', $self->{algorithm} =~ /[\w]+/g;
+    $self->{scheme} = join '', $self->algorithm =~ /[\w]+/g;
     $self->{scheme} = 'S'.$self->{scheme} if $self->{salt};
 
     given ($self->{scheme}) {
@@ -530,20 +530,20 @@ sub _get_settings {
     }
 
     # Bcrypt requires a cost parameter
-    if ($self->{algorithm} eq 'Bcrypt') {
+    if ($self->algorithm eq 'Bcrypt') {
         $self->{scheme} = 'CRYPT';
         $self->{type} = '2a';
         $self->{cost} = $options->{cost} ||
                         $plugin_setting->{cost} ||
                         4;
 
-        $self->{cost} = 31 if $self->{cost} > 31;
-        $self->{cost} = sprintf("%02d", $self->{cost});
+        $self->{cost} = 31 if $self->cost > 31;
+        $self->{cost} = sprintf("%02d", $self->cost);
     }
 
     # PBKDF2 requires an iteration parameter
     # Eventually, when Digest::PBKDF2 is updated
-    if ($self->{algorithm} eq 'PBKDF2') {
+    if ($self->algorithm eq 'PBKDF2') {
         $self->{scheme} = 'CRYPT';
         $self->{iterations} = $options->{iterations} ||
                         $plugin_setting->{iterations} ||
