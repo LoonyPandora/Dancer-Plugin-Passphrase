@@ -65,6 +65,7 @@ our $VERSION = '2.0.0';
 # of the object unless we are calling a method on it
 use overload (
     '""' => 'rfc2307',
+    fallback => 1,
 );
 
 register passphrase => \&passphrase;
