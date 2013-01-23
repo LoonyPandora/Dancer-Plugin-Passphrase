@@ -10,8 +10,9 @@ before_install:
     - cpanm Dist::Zilla --quiet --notest
 
 install:
-    - dzil authordeps | xargs cpanm --quiet --notest
-    - dzil listdeps | xargs cpanm --quiet --notest
+    - dzil authordeps | xargs cpanm --verbose --notest --reinstall
+    - dzil listdeps | xargs cpanm --verbose --notest --reinstall
+    - cpanm --verbose --installdeps
 
 script:
     - dzil smoke --release
