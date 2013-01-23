@@ -10,9 +10,8 @@ before_install:
     - cpanm Dist::Zilla --quiet --notest
 
 install:
-    - echo $PERL_CPANM_OPT
-    - dzil authordeps | xargs cpanm --verbose --notest --noskip-satisfied
-    - dzil listdeps | xargs cpanm --verbose --notest --noskip-satisfied
+    - dzil authordeps | xargs cpanm --quiet --notest --noskip-satisfied
+    - dzil listdeps | xargs cpanm --quiet --notest --noskip-satisfied
 
 script:
     - dzil smoke --release
