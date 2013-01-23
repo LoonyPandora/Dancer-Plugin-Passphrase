@@ -1,30 +1,30 @@
 # From: https://github.com/github/gitignore/blob/master/Global/Linux.gitignore
 !.gitignore
 *~
-*.sw[a-p]
-.directory
-
 
 # From: https://github.com/github/gitignore/blob/master/Global/Windows.gitignore
 Thumbs.db
+ehthumbs.db
 Desktop.ini
-
+$RECYCLE.BIN/
 
 # From https://github.com/github/gitignore/blob/master/Global/OSX.gitignore
 .DS_Store
-Icon?
+.AppleDouble
+.LSOverride
+Icon
 ._*
 .Spotlight-V100
 .Trashes
 
-
 # From https://github.com/github/gitignore/blob/master/Perl.gitignore
 blib/
+.build/
 _build/
-.build
 cover_db/
 inc/
 Build
+!Build/
 Build.bat
 .last_cover_stats
 Makefile
@@ -34,4 +34,3 @@ META.yml
 MYMETA.yml
 nytprof.out
 pm_to_blib
-pod2htm*.tmp
