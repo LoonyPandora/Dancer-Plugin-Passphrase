@@ -12,8 +12,8 @@ This plugin manages the hashing of passwords for Dancer apps, allowing
 developers to follow cryptography best practices without having to 
 become a cryptography expert.
 
-It uses the bcrypt algorithm as the default, wrapping L<Crypt::Eksblowfish::Bcrypt>, 
-while also supporting any hashing function provided by L<Digest> 
+It uses the bcrypt algorithm as the default, while also supporting any
+hashing function provided by L<Digest> 
 
 =head1 USAGE
 
@@ -703,7 +703,7 @@ or
 
     Input must contain only octets
 
-The C<MD5> and C<bcrypt> algorithms can't handle chracters with an ordinal
+The C<MD5>, C<bcrypt>, and C<SHA> algorithms can't handle chracters with an ordinal
 value above 255, producing errors like this if they encounter them.
 It is not possible for this plugin to automagically work out the correct
 encoding for a given string.
