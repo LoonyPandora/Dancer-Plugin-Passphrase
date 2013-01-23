@@ -6,7 +6,7 @@
     * Added support for $2x$ and $2y$ variants of bcrypt
     * Added 'algorithm' method, for finding out exactly which module generated your hash
     * Now croaks when non RFC2307 string string is passed to the matches method
-    
+
     [ MISC ]
     * Large code refactor to ease future maintenance
     * Removed deprecated true_random_salt setting
@@ -22,7 +22,7 @@
     [ DOCUMENTATION ]
     * Use Pod::Coverage to make sure all methods are documented fully
     * Added better documentation for best-practice when matching legacy hashes
-    
+
     [ TESTS ]
     * Added Tests for defined but false salts
     * Module is now tested by Travis CI
@@ -37,7 +37,7 @@
     [ BUGFIX ]
     * GH #2: Improved error handling when trying to use the matches() method
       without providing a valid RFC 2307 string
-      
+
 
 1.0.0   2011-12-01
 
@@ -47,7 +47,7 @@
       The { return_object => 1 } syntax is removed with immediate effect
       If you used the { return_object => 1 } syntax, it will no longer work.
 
-      This is a backwards incompatible change. 
+      This is a backwards incompatible change.
 
 
 0.1.1   2011-10-18

@@ -52,7 +52,7 @@ use Dancer::Plugin;
 
 use Carp qw(croak);
 use Data::Entropy qw(entropy_source);
-use Data::Entropy::Algorithms qw(rand_bits rand_int);
+use Data::Entropy::Algorithms qw(rand_int);
 use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
 use Scalar::Util qw(blessed);
@@ -86,7 +86,7 @@ sub passphrase {
     # Dancer 2 keywords receive a reference to the DSL object as a first param.
     # We don't need it, so get rid of it, and just get the plaintext
     shift if blessed($_[0]) && $_[0]->isa('Dancer::Core::DSL');
-    
+
     my $plaintext = $_[0];
 
     return bless {
@@ -120,7 +120,7 @@ This is not recommended, and should only be used to upgrade old insecure hashes
 
     my $phrase = passphrase('my password')->generate({
         algorithm  => '',   # What algorithm is used to generate the hash
-        cost       => '',   # Cost / Work Factor if using bcrypt 
+        cost       => '',   # Cost / Work Factor if using bcrypt
         salt       => '',   # Manually specify salt if using a salted digest
     });
 
@@ -250,8 +250,7 @@ This is the scheme name as used in the RFC 2307 representation
 
     passphrase('my password')->generate->scheme;
 
-The scheme name can be any of the following, and will always be 
-capitalized
+The scheme name can be any of the following, and will always be capitalized
 
     SMD5  SSHA  SSHA224  SSHA256  SSHA384  SSHA512  CRYPT
     MD5   SHA   SHA224   SHA256   SHA384   SHA512
@@ -334,7 +333,7 @@ Returns C<undef> if there is no salt.
 
 =cut
 
-sub salt_hex {    
+sub salt_hex {
     return unpack("H*", shift->{salt}) // undef;
 }
 
@@ -471,7 +470,7 @@ sub _extract_settings {
     $self->{algorithm} = $scheme_meta->{$scheme}->{algorithm};
 
     if (!defined $self->{salt}) {
-        $self->{salt} = substr(decode_base64($settings), $scheme_meta->{$scheme}->{octets});    
+        $self->{salt} = substr(decode_base64($settings), $scheme_meta->{$scheme}->{octets});
     }
 
     return $self;
@@ -483,8 +482,8 @@ sub _extract_settings {
 sub _get_settings {
     my ($self, $options) = @_;
 
-    $self->{algorithm} = $options->{algorithm} || 
-                         plugin_setting->{algorithm} || 
+    $self->{algorithm} = $options->{algorithm} ||
+                         plugin_setting->{algorithm} ||
                          'Bcrypt';
 
     my $plugin_setting = plugin_setting->{$self->algorithm};
@@ -536,8 +535,8 @@ sub _en_bcrypt_base64 {
     $text =~ tr{A-Za-z0-9+/=}{./A-Za-z0-9}d;
     return $text;
 }
- 
- 
+
+
 # And the decoder of bcrypt's custom base64
 sub _de_bcrypt_base64 {
     my ($text) = @_;
@@ -545,7 +544,6 @@ sub _de_bcrypt_base64 {
     $text .= "=" x (3 - (length($text) + 3) % 4);
     return decode_base64($text);
 }
- 
 
 register_plugin for_versions => [ 1, 2 ];
 

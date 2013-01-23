@@ -9,7 +9,7 @@ use Encode;
 
 # Unicode Character 'PILE OF POO'.
 my $secret      = "\x{1F4A9}";
-my $utf8_secret = Encode::encode_utf8("\x{1F4A9}"); 
+my $utf8_secret = Encode::encode_utf8("\x{1F4A9}");
 
 
 # SHA-1 Tests
