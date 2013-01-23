@@ -51,8 +51,7 @@ use feature 'switch';
 use Dancer::Plugin;
 
 use Carp qw(croak);
-use Data::Entropy qw(entropy_source);
-use Data::Entropy::Algorithms qw(rand_int);
+use Data::Entropy::Algorithms qw(rand_bits rand_int);
 use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
 use Scalar::Util qw(blessed);
@@ -489,9 +488,11 @@ sub _get_settings {
     my $plugin_setting = plugin_setting->{$self->algorithm};
 
     # Specify empty string to get an unsalted hash
+    # Leaving it undefs results in 128 random bits being used as salt
+    # bcrypt requires this amount, and is reasonable for other algorithms
     $self->{salt} = $options->{salt} //
                     $plugin_setting->{salt} //
-                    $self->_generate_salt();
+                    rand_bits(128);
 
     # RFC 2307 scheme is based on the algorithm, with a prefixed 'S' for salted
     $self->{scheme} = join '', $self->algorithm =~ /[\w]+/g;
@@ -518,15 +519,6 @@ sub _get_settings {
 }
 
 
-# Generates 128 bits of entropy to use as a salt. bcrypt requires
-# exactly this amount, and it's a reasonable amount for other algorithms
-sub _generate_salt {
-    my $self = shift;
-
-    entropy_source->get_bits(128);
-}
-
-
 # From Crypt::Eksblowfish::Bcrypt.
 # Bcrypt uses it's own variation on base64
 sub _en_bcrypt_base64 {
@@ -544,6 +536,7 @@ sub _de_bcrypt_base64 {
     $text .= "=" x (3 - (length($text) + 3) % 4);
     return decode_base64($text);
 }
+
 
 register_plugin for_versions => [ 1, 2 ];
 
