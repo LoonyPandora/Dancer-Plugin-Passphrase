@@ -55,13 +55,18 @@ use Data::Entropy qw(entropy_source);
 use Data::Entropy::Algorithms qw(rand_bits rand_int);
 use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
+use Scalar::Util qw(blessed);
 
 our $VERSION = '2.0.0';
 
 # Auto stringifies and returns the RFC 2307 representation
 # of the object unless we are calling a method on it
 use overload (
-    '""' => sub { $_[0]->rfc2307() if $_[0]->isa('Dancer::Plugin::Passphrase') },
+    '""' => sub {
+        if (blessed($_[0]) && $_[0]->isa('Dancer::Plugin::Passphrase')) {
+            $_[0]->rfc2307();
+        }
+    },
     fallback => 1,
 );
 
@@ -80,7 +85,7 @@ object that you can generate a new hash from, or match against a stored hash.
 sub passphrase {
     # Dancer 2 keywords receive a reference to the DSL object as a first param.
     # We don't need it, so get rid of it, and just get the plaintext
-    shift if Scalar::Util::blessed($_[0]) && $_[0]->isa('Dancer::Core::DSL');
+    shift if blessed($_[0]) && $_[0]->isa('Dancer::Core::DSL');
     
     my $plaintext = $_[0];
 
