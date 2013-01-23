@@ -8,7 +8,7 @@ use Dancer::Plugin::Passphrase;
 
 my $secret = "Super Secret Squirrel";
 
-for (qw(MD5 SHA-1 SHA-224 SHA-256 SHA-384 SHA-512 Bcrypt PBKDF2)) {
+for (qw(MD5 SHA-1 SHA-224 SHA-256 SHA-384 SHA-512 Bcrypt)) {
     my $rfc2307 = passphrase($secret)->generate({ algorithm => $_ })->rfc2307;
 
     ok(passphrase($secret)->matches($rfc2307),  "With Salt - Match plaintext to hash => $_");

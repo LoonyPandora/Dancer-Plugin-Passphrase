@@ -48,8 +48,6 @@ while also supporting any hashing function provided by L<Digest>
 use strict;
 use feature 'switch';
 
-# use lib '/Users/james/Sites/Digest-PBKDF2/lib';
-
 use Dancer::Plugin;
 
 use Carp qw(croak);
@@ -153,7 +151,7 @@ the password hash and the salt concatenated together - in that order.
     '{'.$scheme.'}'.encode_base64($hash . $salt, '');
 
 Where C<$scheme> can be any of the following and their unsalted variants,
-which have the leading S removed. CRYPT will be either Bcrypt of PBKDF2.
+which have the leading S removed. CRYPT will be Bcrypt.
 
     SMD5 SSHA SSHA224 SSHA256 SSHA384 SSHA512 CRYPT
 
@@ -287,20 +285,6 @@ sub cost {
 }
 
 
-=head2 iterations
-
-Returns the PBKDF2 iteration count from a C<Dancer::Plugin::Passphrase> object.
-Only works when using the PBKDF2 algorithm, returns undef for other algorithms
-
-    passphrase('my password')->generate->iterations;
-
-=cut
-
-sub iterations {
-    return shift->{iterations} || undef;
-}
-
-
 =head2 raw_salt
 
 Returns the raw salt from a C<Dancer::Plugin::Passphrase> object.
@@ -422,18 +406,6 @@ sub _calculate_hash {
                 . _en_bcrypt_base64($self->raw_salt)
                 . _en_bcrypt_base64($self->{hash});
         }
-        when ('PBKDF2') {
-            $hasher->add($self->{plaintext});
-            $hasher->salt($self->raw_salt);
-            $hasher->iterations($self->iterations);
-
-            $self->{hash} = $hasher->digest;
-            $self->{rfc2307}
-                = '{CRYPT}$PBKDF2$HMACSHA1:'
-                . $self->iterations . ':'
-                . encode_base64($self->raw_salt, '') . '$'
-                . encode_base64($self->{hash},   '');
-        }
         default {
             $hasher->add($self->{plaintext});
             $hasher->add($self->{salt});
@@ -467,12 +439,6 @@ sub _extract_settings {
 
                 ($self->{type}, $self->{cost}, $self->{salt}) = ($1, $2, _de_bcrypt_base64($3));
             }
-            when (/^\$PBKDF2\$/) {
-                $scheme = 'PBKDF2';
-                $settings =~ m{\A\$PBKDF2\$HMACSHA1:([0-9]{2,4}):([+/=A-Za-z0-9]+)\$}x;
-
-                ($self->{iterations}, $self->{salt}) = ($1, decode_base64($2));
-            }
             default { croak "Unknown CRYPT format: $_"; }
         }
     }
@@ -490,7 +456,6 @@ sub _extract_settings {
         'SSHA384' => { algorithm => 'SHA-384', octets => 384 / 8 },
         'SHA512'  => { algorithm => 'SHA-512', octets => 512 / 8 },
         'SSHA512' => { algorithm => 'SHA-512', octets => 512 / 8 },
-        'PBKDF2'  => { algorithm => 'PBKDF2',  octets => 128 / 8 },
         'Bcrypt'  => { algorithm => 'Bcrypt',  octets => 128 / 8 },
     };
 
@@ -540,15 +505,6 @@ sub _get_settings {
 
         $self->{cost} = 31 if $self->cost > 31;
         $self->{cost} = sprintf("%02d", $self->cost);
-    }
-
-    # PBKDF2 requires an iteration parameter
-    # Eventually, when Digest::PBKDF2 is updated
-    if ($self->algorithm eq 'PBKDF2') {
-        $self->{scheme} = 'CRYPT';
-        $self->{iterations} = $options->{iterations} ||
-                        $plugin_setting->{iterations} ||
-                        1000;
     }
 
     return $self;
@@ -671,7 +627,6 @@ If the string gets truncated, the password can I<never> be validated.
     ALGORITHM   LENGTH  EXAMPLE RFC 2307 STRING
     
     Bcrypt      68      {CRYPT}$2a$04$MjkMhQxasFQod1qq56DXCOvWu6YTWk9X.EZGnmSSIbbtyEBIAixbS
-    PBKDF2      83      {CRYPT}$PBKDF2$HMACSHA1:1000:rk+lLVEK4hIaO7LD1XAqFQ==$JLD02XHAB1dNZCl9coIcvu8OIMc=
     SHA-512     118     {SSHA512}lZG4dZ5EU6dPEbJ1kBPPzEcupFloFSIJjiXCwMVxJXOy/x5qhBA5XH8FiUWj7u59onQxa97xYdqje/fwY5TDUcW1Urplf3KHMo9NO8KO47o=
     SHA-384     98      {SSHA384}SqZF5YYyk4NdjIM8YgQVfRieXDxNG0dKH4XBcM40Eblm+ribCzdyf0JV7i2xJvVHZsFSQNcuZPKtiTMzDyOU+w==
     SHA-256     74      {SSHA256}xsJHNzPlNCpOZ41OkTfQOU35ZY+nRyZFaM8lHg5U2pc0xT3DKNlGW2UTY0NPYsxU
