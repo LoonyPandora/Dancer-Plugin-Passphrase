@@ -1,9 +1,10 @@
 2.0.0   2013-01-25
 
     [ FEATURE ]
+    * Module is now compatible with Dancer 1 and Dancer 2
     * Improved support for bcrypt using the new Digest::Bcrypt module
-    * Added support for $2x$ and $2y$ variations of bcrypt
-    * Added algorithm method, for finding out exactly which module generated your hash
+    * Added support for $2x$ and $2y$ variants of bcrypt
+    * Added 'algorithm' method, for finding out exactly which module generated your hash
     * Now croaks when non RFC2307 string string is passed to the matches method
     
     [ MISC ]
@@ -16,7 +17,7 @@
       return incorrect values when working on bcrypt hashes.
     * Fix issues with utf8 encoding and SHA hashes, caused by changes in Digest::SHA
     * Fix stringification issues when comparing passphrase objects with 'ne'
-       (Dave Cross)
+        (Dave Cross)
 
     [ DOCUMENTATION ]
     * Use Pod::Coverage to make sure all methods are documented fully
