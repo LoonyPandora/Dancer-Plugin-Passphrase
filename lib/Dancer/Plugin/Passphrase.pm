@@ -61,7 +61,7 @@ our $VERSION = '2.0.0';
 # Auto stringifies and returns the RFC 2307 representation
 # of the object unless we are calling a method on it
 use overload (
-    '""' => 'rfc2307',
+    '""' => sub { $_[0]->rfc2307() if $_[0]->isa('Dancer::Plugin::Passphrase') },
     fallback => 1,
 );
 
@@ -78,7 +78,11 @@ object that you can generate a new hash from, or match against a stored hash.
 =cut
 
 sub passphrase {
-    my $plaintext = shift;
+    # Dancer 2 keywords receive a reference to the DSL object as a first param.
+    # We don't need it, so get rid of it, and just get the plaintext
+    shift if Scalar::Util::blessed($_[0]) && $_[0]->isa('Dancer::Core::DSL');
+    
+    my $plaintext = $_[0];
 
     return bless {
         plaintext => $plaintext
@@ -538,8 +542,7 @@ sub _de_bcrypt_base64 {
 }
  
 
-
-register_plugin;
+register_plugin for_versions => [ 1, 2 ];
 
 1;
 
