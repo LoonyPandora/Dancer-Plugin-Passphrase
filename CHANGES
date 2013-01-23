@@ -24,6 +24,7 @@
     
     [ TESTS ]
     * Added Tests for defined but false salts
+    * Module is now tested by Travis CI
 
 
 1.0.1   2012-03-30
