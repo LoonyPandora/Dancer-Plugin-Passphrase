@@ -3,6 +3,7 @@ use Test::More tests => 2;
 use strict;
 use warnings;
 
+use Dancer qw(:tests);
 use Dancer::Plugin::Passphrase;
 
 my $secret = "Super Secret Squirrel";
