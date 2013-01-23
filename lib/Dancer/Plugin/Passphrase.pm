@@ -51,7 +51,6 @@ use feature 'switch';
 use Dancer::Plugin;
 
 use Carp qw(croak);
-use Data::Dump qw(dump);
 use Data::Entropy qw(entropy_source);
 use Data::Entropy::Algorithms qw(rand_bits rand_int);
 use Digest;
