@@ -6,12 +6,8 @@ perl:
     - "5.12"
     - "5.10"
 
-before_install:
-    - cpanm Dist::Zilla --quiet --notest
-
 install:
-    - dzil authordeps | xargs cpanm --quiet --notest --noskip-satisfied
-    - dzil listdeps | xargs cpanm --quiet --notest --noskip-satisfied
+    - dzil listdeps --author | xargs cpanm --quiet --notest --noskip-satisfied
 
 script:
-    - dzil smoke --release
+    - dzil smoke
