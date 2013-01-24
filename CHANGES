@@ -6,6 +6,8 @@
     * Added support for $2x$ and $2y$ variants of bcrypt
     * Added 'algorithm' method, for finding out exactly which module generated your hash
     * Now croaks when non RFC2307 string string is passed to the matches method
+    * Made method names more consistent. raw_hash and raw_salt now become hash_raw and salt_raw
+      The old methods are deprecated, but remain for backwards compatibility.
 
     [ MISC ]
     * Large code refactor to ease future maintenance
@@ -13,7 +15,7 @@
     * Deprecated as_rfc2307 and generate_hash methods
 
     [ BUGFIX ]
-    * Fix issue where the hash_hex, hash_b64, and raw_hash methods
+    * Fix issue where the hash_hex, hash_base64, and raw_hash methods
       return incorrect values when working on bcrypt hashes.
     * Fix issues with utf8 encoding and SHA hashes, caused by changes in Digest::SHA
     * Fix stringification issues when comparing passphrase objects with 'ne'
@@ -25,6 +27,8 @@
 
     [ TESTS ]
     * Added Tests for defined but false salts
+    * Added Tests for checking deprecated methods still work
+    * More thoroughly test methods for extracting the salt/hash from an RFC2307 string
     * Module is now tested by Travis CI
 
 
