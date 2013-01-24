@@ -25,7 +25,7 @@ hashing function provided by L<Digest>
         my $phrase = passphrase( param('my password') )->generate;
 
         # $phrase is now an object that contains RFC 2307 representation
-        # of the hashed passphrase, along with the salt and the raw_hash
+        # of the hashed passphrase, along with the salt, and other metadata
         
         # You should store $phrase->rfc2307() for use later
     };
@@ -50,7 +50,7 @@ use feature 'switch';
 
 use Dancer::Plugin;
 
-use Carp qw(croak);
+use Carp qw(carp croak);
 use Data::Entropy::Algorithms qw(rand_bits rand_int);
 use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
@@ -134,9 +134,10 @@ sub generate {
     return $self;
 }
 
-# Alias for backwards compatibility
-*generate_hash = \&generate;
-
+sub generate_hash {
+    carp "generate_hash method is deprecated";
+    return shift->generate();
+}
 
 
 =head2 matches
@@ -236,8 +237,10 @@ sub rfc2307 {
     return shift->{rfc2307} || undef;
 }
 
-# Alias for backwards compatibility
-*as_rfc2307 = \&rfc2307;
+sub as_rfc2307 {
+    carp "as_rfc2307 method is deprecated";
+    return shift->rfc2307();
+}
 
 
 
@@ -291,11 +294,11 @@ sub cost {
 }
 
 
-=head2 raw_salt
+=head2 salt_raw
 
 Returns the raw salt from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('my password')->generate->raw_salt;
+    passphrase('my password')->generate->salt_raw;
 
 Can be defined, but false - The empty string is technically a valid salt.
 
@@ -303,21 +306,30 @@ Returns C<undef> if there is no salt.
 
 =cut
 
-sub raw_salt {
+sub salt_raw {
     return shift->{salt} // undef;
 }
 
+sub raw_salt {
+    carp "raw_salt method is deprecated";
+    return shift->salt_raw();
+}
 
-=head2 raw_hash
+=head2 hash_raw
 
 Returns the raw hash from a C<Dancer::Plugin::Passphrase> object.
 
-    passphrase('my password')->generate->raw_hash;
+    passphrase('my password')->generate->hash_raw;
 
 =cut
 
-sub raw_hash {
+sub hash_raw {
     return shift->{hash} || undef;
+}
+
+sub raw_hash {
+    carp "raw_hash method is deprecated";
+    return shift->hash_raw();
 }
 
 
@@ -401,7 +413,7 @@ sub _calculate_hash {
     given ($self->algorithm) {
         when ('Bcrypt') {
             $hasher->add($self->{plaintext});
-            $hasher->salt($self->raw_salt);
+            $hasher->salt($self->salt_raw);
             $hasher->cost($self->cost);
 
             $self->{hash} = $hasher->digest;
@@ -409,8 +421,8 @@ sub _calculate_hash {
                 = '{CRYPT}$'
                 . $self->{type} . '$'
                 . $self->cost . '$'
-                . _en_bcrypt_base64($self->raw_salt)
-                . _en_bcrypt_base64($self->{hash});
+                . _en_bcrypt_base64($self->salt_raw)
+                . _en_bcrypt_base64($self->hash_raw);
         }
         default {
             $hasher->add($self->{plaintext});
@@ -419,7 +431,7 @@ sub _calculate_hash {
             $self->{hash} = $hasher->digest;
             $self->{rfc2307}
                 = '{' . $self->{scheme} . '}'
-                . encode_base64($self->{hash} . $self->{salt}, '');
+                . encode_base64($self->hash_raw . $self->salt_raw, '');
         }
     }
 
