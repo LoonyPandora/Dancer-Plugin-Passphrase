@@ -15,10 +15,10 @@ ok(ref($object) eq 'Dancer::Plugin::Passphrase',  'Creates correct object');
 ok($object->rfc2307,                              'Contains RFC 2307 representation');
 ok($object->algorithm  eq 'Bcrypt',               'Contains correct scheme');
 ok($object->cost       eq '04',                   'Contains correct cost');
-ok($object->raw_hash,                             'Contains raw salt');
+ok($object->hash_raw,                             'Contains raw salt');
 ok($object->hash_hex,                             'Contains hex hash');
 ok($object->hash_base64,                          'Contains base64 hash');
-ok($object->raw_salt,                             'Contains raw salt');
+ok($object->salt_raw,                             'Contains raw salt');
 ok($object->salt_hex,                             'Contains hex salt');
 ok($object->salt_base64,                          'Contains base64 salt');
 ok($object->plaintext eq $secret,                 'Contains correct plaintext');
@@ -33,7 +33,7 @@ my $extracted_hash = substr(decode_base64($settings), 0, 256 / 8);
 
 is(
     $extracted_salt,
-    $salted_object->raw_salt,
+    $salted_object->salt_raw,
     "Extracted raw salt is the same as the defined raw salt"
 );
 
@@ -51,7 +51,7 @@ is(
 
 is(
     $extracted_hash,
-    $salted_object->raw_hash,
+    $salted_object->hash_raw,
     "Extracted raw hash is the same as the defined raw hash"
 );
 
@@ -71,7 +71,7 @@ is(
 
 # Do check defined but empty salts too.
 my $saltless_object = passphrase($secret)->generate({ algorithm => 'SHA-1', salt => '' });
-ok(defined $saltless_object->raw_salt,    'Contains a defined, but empty raw salt');
+ok(defined $saltless_object->salt_raw,    'Contains a defined, but empty raw salt');
 ok(defined $saltless_object->salt_hex,    'Contains a defined, but empty hex salt');
 ok(defined $saltless_object->salt_base64, 'Contains a defined, but empty base64 salt');
 
