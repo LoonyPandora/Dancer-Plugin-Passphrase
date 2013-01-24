@@ -21,7 +21,7 @@ hashing function provided by [Digest](https://metacpan.org/module/Digest)
         my $phrase = passphrase( param('my password') )->generate;
 
         # $phrase is now an object that contains RFC 2307 representation
-        # of the hashed passphrase, along with the salt and the raw_hash
+        # of the hashed passphrase, along with the salt, and other metadata
         
 
         # You should store $phrase->rfc2307() for use later
@@ -71,7 +71,7 @@ This is not recommended, and should only be used to upgrade old insecure hashes
 
     my $phrase = passphrase('my password')->generate({
         algorithm  => '',   # What algorithm is used to generate the hash
-        cost       => '',   # Cost / Work Factor if using bcrypt 
+        cost       => '',   # Cost / Work Factor if using bcrypt
         salt       => '',   # Manually specify salt if using a salted digest
     });
 
@@ -146,8 +146,7 @@ This is the scheme name as used in the RFC 2307 representation
 
     passphrase('my password')->generate->scheme;
 
-The scheme name can be any of the following, and will always be 
-capitalized
+The scheme name can be any of the following, and will always be capitalized
 
     SMD5  SSHA  SSHA224  SSHA256  SSHA384  SSHA512  CRYPT
     MD5   SHA   SHA224   SHA256   SHA384   SHA512
@@ -168,21 +167,21 @@ Only works when using the bcrypt algorithm, returns undef for other algorithms
 
     passphrase('my password')->generate->cost;
 
-## raw\_salt
+## salt\_raw
 
 Returns the raw salt from a `Dancer::Plugin::Passphrase` object.
 
-    passphrase('my password')->generate->raw_salt;
+    passphrase('my password')->generate->salt_raw;
 
 Can be defined, but false - The empty string is technically a valid salt.
 
 Returns `undef` if there is no salt.
 
-## raw\_hash
+## hash\_raw
 
 Returns the raw hash from a `Dancer::Plugin::Passphrase` object.
 
-    passphrase('my password')->generate->raw_hash;
+    passphrase('my password')->generate->hash_raw;
 
 ## salt\_hex
 
