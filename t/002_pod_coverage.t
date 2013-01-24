@@ -8,9 +8,9 @@ plan skip_all => "Test::Pod::Coverage 1.08 required for testing POD coverage" if
 
 plan tests => 1;
 
-# as_rfc2307 & generate_hash are aliases for rfc2307 & generate
+# Trustme contains subs that are deprecated, and just wrappers for renamed versions
 pod_coverage_ok(
     "Dancer::Plugin::Passphrase",
-    { trustme => ['as_rfc2307', 'generate_hash'] },
+    { trustme => ['as_rfc2307', 'generate_hash', 'raw_hash', 'raw_salt'] },
     "Dancer::Plugin::Passphrase has full POD coverage"
 );
