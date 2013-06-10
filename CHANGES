@@ -1,3 +1,14 @@
+2.0.1   2013-03-30
+
+    [ REGRESSION ]
+    * Module is NO LONGER compatible with Dancer 1 and Dancer 2
+        Dancer2 has been moved to a different namespace, and modules are no longer cross-compatible
+
+    [ BUGFIX ]
+    * Fix minimin required version of Digest::SHA
+        (Andreas Koenig)
+
+
 2.0.0   2013-01-25
 
     [ FEATURE ]
