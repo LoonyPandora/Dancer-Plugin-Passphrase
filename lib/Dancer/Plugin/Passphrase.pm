@@ -46,7 +46,6 @@ hashing function provided by L<Digest>
 =cut
 
 use strict;
-use feature 'switch';
 
 use Dancer::Plugin;
 
@@ -410,29 +409,26 @@ sub _calculate_hash {
 
     my $hasher = Digest->new( $self->algorithm );
 
-    given ($self->algorithm) {
-        when ('Bcrypt') {
-            $hasher->add($self->{plaintext});
-            $hasher->salt($self->salt_raw);
-            $hasher->cost($self->cost);
+    if ($self->algorithm eq 'Bcrypt') {
+        $hasher->add($self->{plaintext});
+        $hasher->salt($self->salt_raw);
+        $hasher->cost($self->cost);
 
-            $self->{hash} = $hasher->digest;
-            $self->{rfc2307}
-                = '{CRYPT}$'
-                . $self->{type} . '$'
-                . $self->cost . '$'
-                . _en_bcrypt_base64($self->salt_raw)
-                . _en_bcrypt_base64($self->hash_raw);
-        }
-        default {
-            $hasher->add($self->{plaintext});
-            $hasher->add($self->{salt});
+        $self->{hash} = $hasher->digest;
+        $self->{rfc2307}
+            = '{CRYPT}$'
+            . $self->{type} . '$'
+            . $self->cost . '$'
+            . _en_bcrypt_base64($self->salt_raw)
+            . _en_bcrypt_base64($self->hash_raw);
+    } else {
+        $hasher->add($self->{plaintext});
+        $hasher->add($self->{salt});
 
-            $self->{hash} = $hasher->digest;
-            $self->{rfc2307}
-                = '{' . $self->{scheme} . '}'
-                . encode_base64($self->hash_raw . $self->salt_raw, '');
-        }
+        $self->{hash} = $hasher->digest;
+        $self->{rfc2307}
+            = '{' . $self->{scheme} . '}'
+            . encode_base64($self->hash_raw . $self->salt_raw, '');
     }
 
     return $self;
@@ -450,14 +446,13 @@ sub _extract_settings {
     }
 
     if ($scheme eq 'CRYPT'){
-        given ($settings) {
-            when (/^\$2(?:a|x|y)\$/)     {
-                $scheme = 'Bcrypt';
-                $settings =~ m{\A\$(2a|2x|2y)\$([0-9]{2})\$([./A-Za-z0-9]{22})}x;
+        if ($settings =~ m/^\$2(?:a|x|y)\$/) {
+            $scheme = 'Bcrypt';
+            $settings =~ m{\A\$(2a|2x|2y)\$([0-9]{2})\$([./A-Za-z0-9]{22})}x;
 
-                ($self->{type}, $self->{cost}, $self->{salt}) = ($1, $2, _de_bcrypt_base64($3));
-            }
-            default { croak "Unknown CRYPT format: $_"; }
+            ($self->{type}, $self->{cost}, $self->{salt}) = ($1, $2, _de_bcrypt_base64($3));
+        } else {
+            croak "Unknown CRYPT format: $_";
         }
     }
 
@@ -510,9 +505,10 @@ sub _get_settings {
     $self->{scheme} = join '', $self->algorithm =~ /[\w]+/g;
     $self->{scheme} = 'S'.$self->{scheme} if $self->{salt};
 
-    given ($self->{scheme}) {
-        when ('SHA1')    { $self->{scheme} = 'SHA';   }
-        when ('SSHA1')   { $self->{scheme} = 'SSHA';  }
+    if ($self->{scheme} eq 'SHA1') {
+        $self->{scheme} = 'SHA';
+    } elsif ($self->{scheme} eq 'SSHA1') {
+        $self->{scheme} = 'SSHA';
     }
 
     # Bcrypt requires a cost parameter
