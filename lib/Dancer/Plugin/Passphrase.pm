@@ -55,7 +55,7 @@ use Digest;
 use MIME::Base64 qw(decode_base64 encode_base64);
 use Scalar::Util qw(blessed);
 
-our $VERSION = '2.0.0';
+our $VERSION = '2.0.1';
 
 # Auto stringifies and returns the RFC 2307 representation
 # of the object unless we are calling a method on it
