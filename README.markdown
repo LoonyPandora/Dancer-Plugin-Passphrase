@@ -9,7 +9,7 @@ developers to follow cryptography best practices without having to
 become a cryptography expert.
 
 It uses the bcrypt algorithm as the default, while also supporting any
-hashing function provided by [Digest](https://metacpan.org/module/Digest) 
+hashing function provided by [Digest](https://metacpan.org/pod/Digest) 
 
 # USAGE
 
@@ -23,7 +23,6 @@ hashing function provided by [Digest](https://metacpan.org/module/Digest)
         # $phrase is now an object that contains RFC 2307 representation
         # of the hashed passphrase, along with the salt, and other metadata
         
-
         # You should store $phrase->rfc2307() for use later
     };
 
@@ -85,7 +84,7 @@ Fail-Secure, rather than Fail-Safe.
     passphrase('my password')->matches($stored_rfc_2307_string);
 
 $stored\_rfc\_2307\_string __MUST__ be a valid RFC 2307 string,
-as created by [generate()](#passphrase\_\_generate)
+as created by [generate()](#passphrase__generate)
 
 An RFC 2307 string is made up of a scheme identifier, followed by a
 base64 encoded string. The base64 encoded string should contain
@@ -102,7 +101,7 @@ A complete RFC2307 string looks like this:
 
     {SSHA}K3LAbIjRL5CpLzOlm3/HzS3qt/hUaGVTYWx0
 
-This is the format created by [generate()](#passphrase\_\_generate)
+This is the format created by [generate()](#passphrase__generate)
 
 ## generate\_random
 
@@ -129,8 +128,6 @@ The methods are only applicable once you have called `generate`
     passphrase( 'my password' )->generate->rfc2307; # CORRECT
 
     passphrase( 'my password' )->rfc2307;           # INCORRECT, Returns undef
-
-
 
 ## rfc2307
 
@@ -215,7 +212,7 @@ Returns the base64 encoded hash from a `Dancer::Plugin::Passphrase` object.
 
 ## plaintext
 
-Returns the plaintext password as originally supplied to the [passphrase](https://metacpan.org/module/passphrase) keyword.
+Returns the plaintext password as originally supplied to the [passphrase](https://metacpan.org/pod/passphrase) keyword.
 
     passphrase('my password')->generate->plaintext;
 
@@ -232,8 +229,6 @@ a system that has little real security.
 
 This plugin provides a simple way of managing that complexity, allowing 
 developers to follow crypto best practice without having to become an expert.
-
-
 
 ## Rationale
 
@@ -264,16 +259,14 @@ as computers become more powerful keeps you one step ahead
 For a more detailed description of why bcrypt is preferred, see this article: 
 [http://codahale.com/how-to-safely-store-a-password/](http://codahale.com/how-to-safely-store-a-password/)
 
-
-
 ## Configuration
 
 In your applications config file, you can set the default hashing algorithm,
 and the default settings for every supported algorithm. Calls to
-[generate()](#passphrase\_\_generate) will use the default settings
+[generate()](#passphrase__generate) will use the default settings
 for that algorithm specified in here.
 
-You can override these defaults when you call [generate()](#passphrase\_\_generate).
+You can override these defaults when you call [generate()](#passphrase__generate).
 
 If you do no configuration at all, the default is to bcrypt with a cost of 4, and 
 a strong psuedo-random salt.
@@ -285,8 +278,6 @@ a strong psuedo-random salt.
             Bcrypt:
                 cost: 8
 
-
-
 ## Storage in a database
 
 You should be storing the RFC 2307 string in your database, it's the easiest way
@@ -294,7 +285,7 @@ to use this module. You could store the `raw_salt`, `raw_hash`, and `scheme`
 separately, but this strongly discouraged. RFC 2307 strings are specifically
 designed for storing hashed passwords, and should be used wherever possible.
 
-The length of the string produced by [generate()](#passphrase\_\_generate) can
+The length of the string produced by [generate()](#passphrase__generate) can
 vary dependent on your settings. Below is a table of the lengths generated
 using default settings.
 
@@ -303,7 +294,6 @@ If the string gets truncated, the password can _never_ be validated.
 
     ALGORITHM   LENGTH  EXAMPLE RFC 2307 STRING
     
-
     Bcrypt      68      {CRYPT}$2a$04$MjkMhQxasFQod1qq56DXCOvWu6YTWk9X.EZGnmSSIbbtyEBIAixbS
     SHA-512     118     {SSHA512}lZG4dZ5EU6dPEbJ1kBPPzEcupFloFSIJjiXCwMVxJXOy/x5qhBA5XH8FiUWj7u59onQxa97xYdqje/fwY5TDUcW1Urplf3KHMo9NO8KO47o=
     SHA-384     98      {SSHA384}SqZF5YYyk4NdjIM8YgQVfRieXDxNG0dKH4XBcM40Eblm+ribCzdyf0JV7i2xJvVHZsFSQNcuZPKtiTMzDyOU+w==
@@ -367,8 +357,6 @@ seem familiar, you should probably be using this module
     gives you an easy way to change to a different algorithm, while still allowing
     you to validate old passphrases
 
-
-
 # KNOWN ISSUES
 
 If you see errors like this
@@ -384,7 +372,7 @@ value above 255, producing errors like this if they encounter them.
 It is not possible for this plugin to automagically work out the correct
 encoding for a given string.
 
-If you see errors like this, then you probably need to use the [Encode](https://metacpan.org/module/Encode) module
+If you see errors like this, then you probably need to use the [Encode](https://metacpan.org/pod/Encode) module
 to encode your text as UTF-8 (or whatever encoding it is) before giving it 
 to `passphrase`.
 
@@ -392,24 +380,18 @@ Text encoding is a bag of hurt, and errors like this are probably indicitive
 of deeper problems within your app's code.
 
 You will save yourself a lot of trouble if you read up on the
-[Encode](https://metacpan.org/module/Encode) module sooner rather than later.
+[Encode](https://metacpan.org/pod/Encode) module sooner rather than later.
 
 For further reading on UTF-8, unicode, and text encoding in perl,
 see [http://training.perl.com/OSCON2011/index.html](http://training.perl.com/OSCON2011/index.html)
 
-
-
 # SEE ALSO
 
-[Dancer](https://metacpan.org/module/Dancer), [Digest](https://metacpan.org/module/Digest), [Crypt::Eksblowfish::Bcrypt](https://metacpan.org/module/Crypt::Eksblowfish::Bcrypt), [Dancer::Plugin::Bcrypt](https://metacpan.org/module/Dancer::Plugin::Bcrypt)
-
-
+[Dancer](https://metacpan.org/pod/Dancer), [Digest](https://metacpan.org/pod/Digest), [Crypt::Eksblowfish::Bcrypt](https://metacpan.org/pod/Crypt::Eksblowfish::Bcrypt), [Dancer::Plugin::Bcrypt](https://metacpan.org/pod/Dancer::Plugin::Bcrypt)
 
 # AUTHOR
 
 James Aitken <jaitken@cpan.org>
-
-
 
 # COPYRIGHT AND LICENSE
 
